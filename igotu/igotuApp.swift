@@ -9,9 +9,18 @@ import SwiftUI
 
 @main
 struct igotuApp: App {
+    @StateObject private var configuration = AppConfigurationStore()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Group {
+                if configuration.hasCompletedSetup {
+                    TodayView()
+                } else {
+                    SetUpView()
+                }
+            }
+            .environmentObject(configuration)
         }
     }
 }
