@@ -217,3 +217,8 @@ struct SetUpView: View {
     SetUpView()
         .environmentObject(AppConfigurationStore())
 }
+
+#Preview("Editing") {
+    SetUpView(isEditing: true)
+        .environmentObject(AppConfigurationStore())
+}
