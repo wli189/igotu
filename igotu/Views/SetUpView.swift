@@ -175,17 +175,22 @@ struct SetUpView: View {
             .toolbar {
                 if isEditing {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
+                        Button {
                             dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
                         }
                     }
 
                     ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
+                        Button {
                             if save() {
                                 dismiss()
                             }
+                        } label: {
+                            Image(systemName: "checkmark")
                         }
+                        .buttonStyle(.borderedProminent)
                     }
                 }
             }
