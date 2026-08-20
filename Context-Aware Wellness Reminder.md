@@ -1,8 +1,8 @@
 # Context-Aware Wellness Reminder
 
-A personal wellness assistant for iOS that provides intelligent reminders based on **what the user is doing and which context they are currently in**.
+A personal wellness assistant for iOS that provides intelligent reminders based on **whether the user is sleeping and, when awake, what mode they are in**.
 
-Instead of creating dozens of fixed alarms, users define a few time-based contexts—such as **Work** or **Sleep**—and simply choose which wellness behaviors they want to be reminded about.
+Instead of creating dozens of fixed alarms, users define their sleep schedule and awake modes—initially **Work** and **Idle**—then choose which wellness behaviors they want to be reminded about in each mode.
 
 The app handles the reminder logic automatically.
 
@@ -16,16 +16,16 @@ Most reminder apps are time-based:
 
 This project takes a different approach:
 
-> **"During work, remind me to drink water regularly and remind me to stand if I've been sitting too long."**
+> **"While I am working, remind me to drink water regularly and remind me to stand if I've been sitting too long. When I am idle, use a gentler reminder schedule. Do not send ordinary wellness reminders while I am sleeping."**
 
 The user does not need to configure complicated rules.
 
 They simply:
 
-1. Define a context.
-2. Set the context's active time.
-3. Enable or disable available behaviors.
-4. Choose how frequently each behavior should be reminded.
+1. Set the sleep schedule.
+2. Set the Work schedule within the awake period.
+3. Enable or disable available behaviors for Work and Idle.
+4. Choose how frequently each behavior should be reminded in each mode.
 
 The app handles the underlying scheduling and activity detection.
 
@@ -33,31 +33,34 @@ The app handles the underlying scheduling and activity detection.
 
 # Product Concept
 
-## Contexts
+## Daily Modes
 
-A **Context** represents a period of the user's day with a particular set of reminder behaviors.
+A **Daily Mode** represents the user's current sleep or awake state and determines which reminder configuration is active.
 
-Examples:
+The initial product uses a two-level daily state model rather than a flat list of contexts:
 
-- Work
-- Sleep
-- Study
-- Gaming
-- Morning
-- Evening
-- Custom
+Sleeping has priority over every awake mode. When the user is awake, the app selects Work during the configured Work hours and Idle at all other times.
+
+Initial modes:
+
+- Sleeping: the configured sleep interval. Ordinary wellness reminders are off.
+- Work: a configured interval during the awake day.
+- Idle: any awake time outside the Work interval.
 
 Example:
 
 ```text
+Sleeping
+11:00 PM – 07:00 AM
+
 Work
 09:00 AM – 05:00 PM
 
-Sleep
-11:00 PM – 07:00 AM
+Idle
+05:00 PM – 11:00 PM and 07:00 AM – 09:00 AM
 ```
 
-Each context can have its own reminder configuration.
+Work and Idle each have their own reminder configuration. Sleeping suppresses ordinary reminders.
 
 ---
 
@@ -86,7 +89,7 @@ The goal is not to build a giant health tracker.
 
 # Example
 
-## Work Context
+## Work Mode
 
 ```text
 Work
@@ -125,21 +128,22 @@ Move Around
 
 ---
 
-# Context-Based Behavior
+# Mode-Based Behavior
 
-The same behavior can behave differently depending on the current context.
+The same behavior can behave differently depending on the current mode.
 
 For example:
 
-| Behavior | Work | Study | Home | Sleep |
+| Behavior | Work | Idle | Sleeping |
 |---|---|---|---|---|
-| Drink Water | Regular | Regular | Occasional | Off |
-| Stand Up | Frequent | Frequent | Occasional | Off |
-| Move Around | Regular | Regular | Optional | Off |
-| Rest Eyes | Regular | Frequent | Optional | Off |
-| Wind Down | Off | Off | Regular | Frequent |
+| Drink Water | Regular | Occasional | Off |
+| Stand Up | Frequent | Occasional | Off |
+| Move Around | Regular | Optional | Off |
+| Rest Eyes | Regular | Optional | Off |
+| Take a Break | Regular | Optional | Off |
+| Wind Down | Off | Optional | Off |
 
-This allows the app to adapt to different parts of the user's day without requiring complex configuration.
+This allows the app to adapt to the user's daily rhythm without requiring a flat list of overlapping contexts or complex configuration.
 
 ---
 
@@ -149,9 +153,9 @@ The app should **not** behave like a collection of alarms.
 
 Instead, reminders should be:
 
-### Context-aware
+### Mode-aware
 
-Only active when the relevant context is active.
+Only active when the relevant daily mode is active.
 
 ### Behavior-aware
 
@@ -194,20 +198,30 @@ The first launch should be extremely simple.
 ```text
 Stay Well
 
-When should we remind you?
+When are you sleeping?
+
+┌─────────────────────────┐
+│ 😴 Sleep               │
+│ 11:00 PM – 7:00 AM      │
+└─────────────────────────┘
 
 ┌─────────────────────────┐
 │ 🧑‍💻 Work               │
 │ 9:00 AM – 5:00 PM       │
 └─────────────────────────┘
 
-┌─────────────────────────┐
-│ 😴 Sleep                │
-│ 11:00 PM – 7:00 AM      │
-└─────────────────────────┘
-
         Continue
 ```
+
+The app derives the current mode from these times:
+
+```text
+During Sleep hours → Sleeping
+During Work hours  → Work
+All other awake time → Idle
+```
+
+Sleeping takes priority if schedules overlap. The first version determines the mode from time only; activity-aware detection is introduced later.
 
 ---
 
@@ -224,6 +238,8 @@ Work Reminders
 
         Continue
 ```
+
+After configuring Work, the user configures Idle with the same behavior list and an independent frequency for each behavior.
 
 The app can provide sensible defaults so users can finish setup in under a minute.
 
@@ -268,6 +284,9 @@ Good afternoon
 
 Work
 09:00 AM – 05:00 PM
+
+Sleep schedule
+11:00 PM – 07:00 AM
 
 ────────────────────
 
@@ -321,7 +340,7 @@ A possible architecture:
                        │
           ┌────────────┼────────────┐
           ▼            ▼            ▼
-      Context       Behavior     Activity
+      Daily Mode    Behavior     Activity
       Manager       Rules        Monitor
           │            │            │
           └────────────┼────────────┘
@@ -333,17 +352,31 @@ A possible architecture:
 
 # Core Components
 
-## ContextManager
+## DailyModeManager
 
-Responsible for determining which context is currently active.
+Responsible for determining the current mode from the sleep schedule, Work schedule, and current time.
+
+Resolution order:
+
+```text
+1. If current time is inside Sleep → Sleeping
+2. Else if current time is inside Work → Work
+3. Otherwise → Idle
+```
 
 ```swift
-struct ReminderContext {
+enum DailyMode {
+    case sleeping
+    case work
+    case idle
+}
+
+struct DailySchedule {
     let id: UUID
-    let name: String
-    let startTime: DateComponents
-    let endTime: DateComponents
-    let enabledBehaviors: Set<Behavior>
+    let sleepStart: DateComponents
+    let sleepEnd: DateComponents
+    let workStart: DateComponents
+    let workEnd: DateComponents
 }
 ```
 
@@ -370,7 +403,7 @@ The app controls the behavior definitions instead of allowing users to create ar
 
 ## ReminderRule
 
-Defines how a behavior should behave within a context.
+Defines how a behavior should behave within a daily mode.
 
 ```swift
 struct ReminderRule {
@@ -395,7 +428,7 @@ Conceptually:
 ```text
 Current Time
       +
-Current Context
+Current Daily Mode
       +
 Enabled Behaviors
       +
@@ -436,7 +469,7 @@ Last movement:
 Last water reminder:
 47 minutes ago
 
-Current context:
+Current mode:
 Work
 
 Enabled:
@@ -474,7 +507,7 @@ Notifications should be scheduled intelligently rather than generating a large n
 
 The system should consider:
 
-- Current context
+- Current daily mode
 - Enabled behaviors
 - Minimum interval
 - Previous reminder
@@ -493,15 +526,15 @@ The goal is:
 A simple initial model could be:
 
 ```text
-Context
+DailySchedule
 ├── id
-├── name
-├── startTime
-├── endTime
-└── behaviors
+├── sleepStart
+├── sleepEnd
+├── workStart
+└── workEnd
 
-ContextBehavior
-├── contextID
+ModeBehavior
+├── mode
 ├── behavior
 ├── enabled
 └── frequency
@@ -509,7 +542,7 @@ ContextBehavior
 ReminderEvent
 ├── behavior
 ├── timestamp
-├── context
+├── mode
 └── status
 ```
 
@@ -524,19 +557,19 @@ The first version should stay intentionally small.
 ### Phase 1 — Foundation
 
 - [ ] SwiftUI app
-- [ ] Context creation
-- [ ] Work/Sleep contexts
-- [ ] Start/end time
+- [ ] Sleep schedule
+- [ ] Work schedule
+- [ ] Automatic Sleeping/Work/Idle mode resolution
 - [ ] Predefined behaviors
 - [ ] Enable/disable behaviors
-- [ ] Reminder frequency
+- [ ] Independent reminder frequency for Work and Idle
 - [ ] Local notifications
 
 ### Phase 2 — Smart Reminders
 
 - [ ] Reminder engine
 - [ ] Minimum intervals
-- [ ] Context switching
+- [ ] Mode switching at sleep/work boundaries
 - [ ] Reminder history
 - [ ] Activity-aware reminders
 - [ ] Avoid duplicate reminders
@@ -587,7 +620,7 @@ Frequent
 
 ---
 
-## 2. Context Over Time
+## 2. Mode Over Time
 
 The app should think in terms of:
 
@@ -631,17 +664,15 @@ Its purpose is much narrower:
 
 The long-term vision is a personal **behavior-aware reminder engine**.
 
-The user defines their day:
+The initial product defines the user's day through Sleeping, Work, and Idle:
 
 ```text
+Sleeping
 Work
-Study
-Exercise
-Home
-Sleep
+Idle
 ```
 
-And selects what matters in each context:
+In a later version, the awake portion can be expanded with additional modes such as Study, Exercise, or Home. The initial product only needs Work and Idle. The user selects what matters in each awake mode:
 
 ```text
 Work
@@ -650,16 +681,10 @@ Work
 ├── Move
 └── Eye Rest
 
-Study
+Idle
 ├── Water
-├── Eye Rest
+├── Move
 └── Break
-
-Exercise
-└── Water
-
-Sleep
-└── Wind Down
 ```
 
 The app then quietly manages the reminders in the background.
@@ -692,4 +717,4 @@ A name like **Igotu** could work particularly well if the product personality is
 
 # One-Sentence Product Definition
 
-> **A context-aware iOS wellness assistant that reminds you to take care of yourself at the right time, without making you manage a collection of alarms.**
+> **A mode-aware iOS wellness assistant that reminds you to take care of yourself at the right time, without making you manage a collection of alarms.**
