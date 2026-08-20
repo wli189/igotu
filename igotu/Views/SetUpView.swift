@@ -10,11 +10,19 @@ import SwiftUI
 struct SetUpView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore
     @Environment(\.dismiss) private var dismiss
+
+    let isEditing: Bool
+
     @State private var sleepStart = Self.time(hour: 23)
     @State private var sleepEnd = Self.time(hour: 7)
     @State private var workStart = Self.time(hour: 9)
     @State private var workEnd = Self.time(hour: 18)
     @State private var errorMessage: String?
+    @State private var hasLoadedSavedSchedule = false
+
+    init(isEditing: Bool = false) {
+        self.isEditing = isEditing
+    }
     
     private func components(from date: Date) -> DateComponents {
             Calendar.current.dateComponents([.hour, .minute], from: date)
@@ -22,6 +30,28 @@ struct SetUpView: View {
     
     private static func time(hour: Int) -> Date {
         Calendar.current.date(from: DateComponents(hour: hour))!
+    }
+
+    private static func time(from components: DateComponents) -> Date {
+        Calendar.current.date(
+            from: DateComponents(
+                year: 2000,
+                month: 1,
+                day: 1,
+                hour: components.hour,
+                minute: components.minute
+            )
+        ) ?? .now
+    }
+
+    private func loadSavedSchedule() {
+        guard !hasLoadedSavedSchedule else { return }
+
+        sleepStart = Self.time(from: configuration.schedule.sleepStart)
+        sleepEnd = Self.time(from: configuration.schedule.sleepEnd)
+        workStart = Self.time(from: configuration.schedule.workStart)
+        workEnd = Self.time(from: configuration.schedule.workEnd)
+        hasLoadedSavedSchedule = true
     }
     
     private func minutes(from components: DateComponents) -> Int {
@@ -120,16 +150,48 @@ struct SetUpView: View {
                         displayedComponents: .hourAndMinute
                     )
                 }
+
+                Section("Reminder Preferences") {
+                    NavigationLink("Work Reminders") {
+                        ReminderSettingsView(context: .work)
+                    }
+
+                    NavigationLink("Idle Reminders") {
+                        ReminderSettingsView(context: .idle)
+                    }
+                }
                 
-                Section {
-                    Button("Continue") {
-                        if save() {
-                            dismiss()
+                if !isEditing {
+                    Section {
+                        Button("Continue") {
+                            if save() {
+                                dismiss()
+                            }
                         }
                     }
                 }
             }
-            .navigationTitle("Stay well")
+            .navigationTitle(isEditing ? "Schedule" : "Stay well")
+            .toolbar {
+                if isEditing {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                    }
+
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            if save() {
+                                dismiss()
+                            }
+                        }
+                    }
+                }
+            }
+            .onAppear {
+                loadSavedSchedule()
+            }
         }
         .alert(
             "Cannot Save Schedule",

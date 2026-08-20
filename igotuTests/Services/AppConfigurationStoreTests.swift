@@ -33,4 +33,23 @@ struct AppConfigurationStoreTests {
         #expect(restoredStore.schedule.workEnd.hour == 17)
         #expect(restoredStore.schedule.workEnd.minute == 30)
     }
+
+    @Test func restoresReminderRulesIndependentlyForWorkAndIdle() {
+        let suiteName = "ReminderRulesTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let firstStore = AppConfigurationStore(defaults: defaults)
+        firstStore.setReminderEnabled(false, for: .hydration, in: .work)
+        firstStore.setReminderFrequency(.frequent, for: .movement, in: .idle)
+
+        let restoredStore = AppConfigurationStore(defaults: defaults)
+
+        #expect(!restoredStore.reminderRule(for: .hydration, in: .work).isEnabled)
+        #expect(restoredStore.reminderRule(for: .hydration, in: .idle).isEnabled)
+        #expect(restoredStore.reminderRule(for: .movement, in: .idle).frequency == .frequent)
+        #expect(restoredStore.reminderRule(for: .movement, in: .work).frequency == .regular)
+    }
 }

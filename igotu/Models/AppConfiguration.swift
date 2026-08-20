@@ -7,6 +7,6 @@
 
 struct AppConfiguration {
     var schedule: DailySchedule
-    var workReminders: [Behavior: ReminderFrequency]
-    var idleReminders: [Behavior: ReminderFrequency]
+    var workReminders: [ReminderRule]
+    var idleReminders: [ReminderRule]
 }

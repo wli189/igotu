@@ -47,7 +47,7 @@ struct TodayView: View {
                 }
             }
             .sheet(isPresented: $isShowingSettings) {
-                SetUpView()
+                SetUpView(isEditing: true)
                     .environmentObject(configuration)
             }
         }
