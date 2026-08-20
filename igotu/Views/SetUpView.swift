@@ -63,7 +63,7 @@ struct SetUpView: View {
             return [start..<end]
         }
 
-        return [start..<1_440, 0..<end]
+        return [start..<1440, 0..<end]
     }
     
     private func overlaps(
