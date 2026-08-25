@@ -3,7 +3,7 @@ import AppIntents
 
 struct CompleteWellnessReminderIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Complete Wellness Reminder"
-    static var openAppWhenRun: Bool { true }
+    static var supportedModes: IntentModes { .foreground(.dynamic) }
 
     @Parameter(title: "Event ID")
     var eventID: String
@@ -52,7 +52,7 @@ struct CompleteWellnessReminderIntent: LiveActivityIntent {
 
 struct SkipWellnessReminderIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Skip Wellness Reminder"
-    static var openAppWhenRun: Bool { true }
+    static var supportedModes: IntentModes { .foreground(.dynamic) }
 
     @Parameter(title: "Event ID")
     var eventID: String
