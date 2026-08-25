@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct DailySchedule: Codable {
+struct DailySchedule: Codable, Equatable {
     var sleepStart: DateComponents
     var sleepEnd: DateComponents
     var workStart: DateComponents

@@ -1,4 +1,4 @@
-struct ReminderRule: Identifiable, Codable {
+struct ReminderRule: Identifiable, Codable, Equatable {
     let behavior: Behavior
     var isEnabled: Bool
     var frequency: ReminderFrequency
