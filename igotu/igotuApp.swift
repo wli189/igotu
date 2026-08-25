@@ -70,12 +70,17 @@ struct igotuApp: App {
             switch mode {
             case .sleeping:
                 notificationScheduler.cancelPendingReminder()
+                notificationScheduler.cancelSleepReminder()
                 return
             case .work:
                 rules = configuration.workReminders
             case .idle:
                 rules = configuration.idleReminders
             }
+
+            try await notificationScheduler.scheduleSleepReminderIfNeeded(
+                for: configuration.schedule
+            )
 
             guard let candidate = engine.nextReminder(from: ReminderEngineInput(
                 now: .now,

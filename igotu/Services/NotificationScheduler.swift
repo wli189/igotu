@@ -4,6 +4,8 @@ import UserNotifications
 @MainActor
 final class NotificationScheduler {
     private static let nextReminderIdentifier = "next-reminder"
+    private static let sleepReminderIdentifier = "sleep-reminder"
+    private static let sleepReminderLeadTime: TimeInterval = 30 * 60
 
     private let center: UNUserNotificationCenter
 
@@ -65,10 +67,71 @@ final class NotificationScheduler {
         try await schedule(candidate)
     }
 
+    func scheduleSleepReminderIfNeeded(
+        for schedule: DailySchedule,
+        now: Date = .now
+    ) async throws {
+        guard let sleepStart = schedule.nextSleepStart(after: now) else {
+            cancelSleepReminder()
+            return
+        }
+
+        let pendingRequests = await center.pendingNotificationRequests()
+        guard let pendingRequest = pendingRequests.first(where: {
+            $0.identifier == Self.sleepReminderIdentifier
+        }) else {
+            try await scheduleSleepReminder(at: sleepStart, now: now)
+            return
+        }
+
+        let scheduledSleepStart = pendingRequest.content.userInfo["sleepStart"] as? TimeInterval
+        guard scheduledSleepStart == sleepStart.timeIntervalSince1970 else {
+            try await scheduleSleepReminder(at: sleepStart, now: now)
+            return
+        }
+    }
+
     func cancelPendingReminder() {
         center.removePendingNotificationRequests(
             withIdentifiers: [Self.nextReminderIdentifier]
         )
+    }
+
+    func cancelSleepReminder() {
+        center.removePendingNotificationRequests(
+            withIdentifiers: [Self.sleepReminderIdentifier]
+        )
+    }
+
+    private func scheduleSleepReminder(at sleepStart: Date, now: Date) async throws {
+        let content = UNMutableNotificationContent()
+        content.title = "Wind Down"
+        content.body = "Your scheduled sleep time is in 30 minutes."
+        content.sound = .default
+        content.userInfo = [
+            "kind": "sleep",
+            "sleepStart": sleepStart.timeIntervalSince1970
+        ]
+
+        let reminderDate = sleepStart.addingTimeInterval(-Self.sleepReminderLeadTime)
+        let secondsUntilReminder = max(
+            1,
+            reminderDate.timeIntervalSince(now)
+        )
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: secondsUntilReminder,
+            repeats: false
+        )
+        let request = UNNotificationRequest(
+            identifier: Self.sleepReminderIdentifier,
+            content: content,
+            trigger: trigger
+        )
+
+        center.removePendingNotificationRequests(
+            withIdentifiers: [Self.sleepReminderIdentifier]
+        )
+        try await center.add(request)
     }
 
     private func message(for behavior: Behavior) -> String {
