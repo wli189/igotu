@@ -52,4 +52,17 @@ struct AppConfigurationStoreTests {
         #expect(restoredStore.reminderRule(for: .movement, in: .idle).frequency == .frequent)
         #expect(restoredStore.reminderRule(for: .movement, in: .work).frequency == .regular)
     }
+
+    @Test func restoresDailyGoals() {
+        let suiteName = "DailyGoalsTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let firstStore = AppConfigurationStore(defaults: defaults)
+        firstStore.save(dailyGoals: DailyGoals(hydrationCount: 10, standingHours: 12))
+
+        let restoredStore = AppConfigurationStore(defaults: defaults)
+
+        #expect(restoredStore.dailyGoals == DailyGoals(hydrationCount: 10, standingHours: 12))
+    }
 }

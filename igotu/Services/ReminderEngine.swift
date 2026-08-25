@@ -30,7 +30,9 @@ struct ReminderEngine {
         }
 
         let lastEventByBehavior = Dictionary(
-            grouping: input.recentEvents.filter { $0.context == context },
+            grouping: input.recentEvents.filter {
+                $0.context == context && $0.status.countsTowardCooldown
+            },
             by: \.behavior
         ).compactMapValues { events in
             events.max { $0.timestamp < $1.timestamp }

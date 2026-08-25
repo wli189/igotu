@@ -14,6 +14,7 @@ final class AppConfigurationStore: ObservableObject {
         static let schedule = "dailySchedule"
         static let workReminders = "workReminders"
         static let idleReminders = "idleReminders"
+        static let dailyGoals = "dailyGoals"
     }
 
     private static let defaultSchedule = DailySchedule(
@@ -39,6 +40,7 @@ final class AppConfigurationStore: ObservableObject {
     @Published private(set) var schedule: DailySchedule
     @Published private(set) var workReminders: [ReminderRule]
     @Published private(set) var idleReminders: [ReminderRule]
+    @Published private(set) var dailyGoals: DailyGoals
     @Published private(set) var hasCompletedSetup: Bool
 
     private let defaults: UserDefaults
@@ -55,6 +57,7 @@ final class AppConfigurationStore: ObservableObject {
             key: Key.idleReminders,
             defaultValue: Self.defaultIdleReminders
         )
+        dailyGoals = Self.loadDailyGoals(from: defaults)
 
         guard
             let data = defaults.data(forKey: Key.schedule),
@@ -78,6 +81,23 @@ final class AppConfigurationStore: ObservableObject {
         }
 
         defaults.set(true, forKey: Key.hasCompletedSetup)
+    }
+
+    func save(dailyGoals: DailyGoals) {
+        var sanitizedGoals = dailyGoals
+        sanitizedGoals.hydrationCount = min(
+            max(sanitizedGoals.hydrationCount, DailyGoals.hydrationRange.lowerBound),
+            DailyGoals.hydrationRange.upperBound
+        )
+        sanitizedGoals.standingHours = min(
+            max(sanitizedGoals.standingHours, DailyGoals.standingHoursRange.lowerBound),
+            DailyGoals.standingHoursRange.upperBound
+        )
+
+        self.dailyGoals = sanitizedGoals
+        if let data = try? JSONEncoder().encode(sanitizedGoals) {
+            defaults.set(data, forKey: Key.dailyGoals)
+        }
     }
 
     func reminderRule(for behavior: Behavior, in context: ReminderContext) -> ReminderRule {
@@ -119,6 +139,17 @@ final class AppConfigurationStore: ObservableObject {
         }
 
         return rules
+    }
+
+    private static func loadDailyGoals(from defaults: UserDefaults) -> DailyGoals {
+        guard
+            let data = defaults.data(forKey: Key.dailyGoals),
+            let goals = try? JSONDecoder().decode(DailyGoals.self, from: data)
+        else {
+            return DailyGoals()
+        }
+
+        return goals
     }
 
     private func update(_ rule: ReminderRule, in context: ReminderContext) {

@@ -14,7 +14,17 @@ struct igotuApp: App {
 
     private let modeManager = DailyModeManager()
     private let engine = ReminderEngine()
-    private let notificationScheduler = NotificationScheduler()
+    private let history: ReminderHistoryStore
+    private let notificationScheduler: NotificationScheduler
+
+    init() {
+        let history = ReminderHistoryStore()
+        let notificationScheduler = NotificationScheduler()
+
+        self.history = history
+        self.notificationScheduler = notificationScheduler
+        notificationScheduler.configure(history: history)
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -26,6 +36,7 @@ struct igotuApp: App {
                 }
             }
             .environmentObject(configuration)
+            .environmentObject(history)
             .task(id: configuration.hasCompletedSetup) {
                 guard configuration.hasCompletedSetup else { return }
                 await refreshNotification(replacePending: true)
@@ -60,7 +71,7 @@ struct igotuApp: App {
     private func refreshNotification(replacePending: Bool) async {
         do {
             guard try await notificationScheduler.requestPermission() else {
-                notificationScheduler.cancelPendingReminder()
+                await notificationScheduler.cancelPendingReminder()
                 return
             }
 
@@ -69,7 +80,7 @@ struct igotuApp: App {
 
             switch mode {
             case .sleeping:
-                notificationScheduler.cancelPendingReminder()
+                await notificationScheduler.cancelPendingReminder()
                 notificationScheduler.cancelSleepReminder()
                 return
             case .work:
@@ -86,9 +97,11 @@ struct igotuApp: App {
                 now: .now,
                 mode: mode,
                 rules: rules,
-                recentEvents: []
+                recentEvents: history.recentEvents(
+                    since: .now.addingTimeInterval(-30 * 24 * 60 * 60)
+                )
             )) else {
-                notificationScheduler.cancelPendingReminder()
+                await notificationScheduler.cancelPendingReminder()
                 return
             }
 

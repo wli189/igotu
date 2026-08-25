@@ -269,6 +269,15 @@ Frequent   → 30 minutes
 
 These values can be adjusted later as the product evolves.
 
+## 4. Daily Goals Without HealthKit
+
+The first version can track user-confirmed reminders without reading health data:
+
+- Drink Water: a configurable number of confirmations per day.
+- Stand Up: a configurable number of different hours completed per day. Multiple confirmations in the same hour count once.
+
+Step totals and automatic activity detection require HealthKit and are deferred.
+
 ---
 
 # Home Screen
@@ -570,9 +579,9 @@ The first version should stay intentionally small.
 - [ ] Reminder engine
 - [ ] Minimum intervals
 - [ ] Mode switching at sleep/work boundaries
-- [ ] Reminder history
+- [x] Reminder history
 - [ ] Activity-aware reminders
-- [ ] Avoid duplicate reminders
+- [x] Avoid duplicate reminders
 
 ### Phase 3 — Health Integration
 
@@ -585,7 +594,7 @@ The first version should stay intentionally small.
 
 - [ ] Apple-style UI
 - [ ] Animations
-- [ ] Notification actions
+- [x] Notification actions
 - [ ] Widgets
 - [ ] Apple Watch support
 - [ ] Focus Mode integration

@@ -9,9 +9,11 @@ import SwiftUI
 
 struct TodayView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore
+    @EnvironmentObject private var history: ReminderHistoryStore
     @State private var isShowingSettings = false
     
     private let modeManager = DailyModeManager()
+    private let metricsCalculator = DailyMetricsCalculator()
 
     private var schedule: DailySchedule {
         configuration.schedule
@@ -24,6 +26,10 @@ struct TodayView: View {
                     for: schedule,
                     at: timeline.date
                 )
+                let metrics = metricsCalculator.calculate(
+                    events: history.completedEvents(on: timeline.date),
+                    goals: configuration.dailyGoals
+                )
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
@@ -32,6 +38,8 @@ struct TodayView: View {
                         currentModeCard(mode)
 
                         scheduleSection
+
+                        dailyProgress(metrics)
                     }
                     .padding()
                 }
@@ -118,6 +126,51 @@ struct TodayView: View {
         .padding()
     }
 
+    private func dailyProgress(_ metrics: DailyMetrics) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("TODAY'S PROGRESS")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            progressRow(
+                title: "Drink Water",
+                icon: "drop.fill",
+                value: metrics.hydrationCount,
+                goal: metrics.goals.hydrationCount
+            )
+
+            progressRow(
+                title: "Stand Up",
+                icon: "figure.stand",
+                value: metrics.standingHours,
+                goal: metrics.goals.standingHours
+            )
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func progressRow(
+        title: String,
+        icon: String,
+        value: Int,
+        goal: Int
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(title, systemImage: icon)
+                Spacer()
+                Text("\(min(value, goal)) / \(goal)")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+
+            ProgressView(value: Double(min(value, goal)), total: Double(goal))
+        }
+    }
+
     private func scheduleRow(
         title: String,
         icon: String,
@@ -165,4 +218,5 @@ struct TodayView: View {
 #Preview {
     TodayView()
         .environmentObject(AppConfigurationStore())
+        .environmentObject(ReminderHistoryStore())
 }

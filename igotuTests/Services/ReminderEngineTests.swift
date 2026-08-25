@@ -26,6 +26,24 @@ struct ReminderEngineTests {
         #expect(result == nil)
     }
 
+    @Test func cancelledEventsDoNotDelayTheNextReminder() {
+        let event = ReminderEvent(
+            behavior: .hydration,
+            context: .work,
+            timestamp: now.addingTimeInterval(-10 * 60),
+            status: .cancelled
+        )
+
+        let result = engine.nextReminder(from: input(
+            rules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .regular)
+            ],
+            recentEvents: [event]
+        ))
+
+        #expect(result?.dueAt == now.addingTimeInterval(60 * 60))
+    }
+
     @Test func firstReminderIsScheduledAfterItsFrequencyInterval() {
         let result = engine.nextReminder(from: input(rules: [
             ReminderRule(behavior: .hydration, isEnabled: true, frequency: .regular)

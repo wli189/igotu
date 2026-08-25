@@ -167,6 +167,12 @@ struct SetUpView: View {
                         ReminderSettingsView(context: .idle)
                     }
                 }
+
+                Section("Daily Goals") {
+                    NavigationLink("Water and Standing") {
+                        DailyGoalsSettingsView()
+                    }
+                }
                 
                 if !isEditing {
                     Section {
