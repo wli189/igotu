@@ -42,4 +42,14 @@ enum Weekday: Int, CaseIterable, Codable, Hashable, Identifiable {
         .thursday,
         .friday
     ]
+
+    static let mondayFirst: [Weekday] = [
+        .monday,
+        .tuesday,
+        .wednesday,
+        .thursday,
+        .friday,
+        .saturday,
+        .sunday
+    ]
 }

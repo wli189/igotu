@@ -154,22 +154,8 @@ struct SetUpView: View {
                     )
                 }
 
-                Section("Work Days") {
-                    ForEach(Weekday.allCases) { weekday in
-                        Toggle(
-                            weekday.title,
-                            isOn: Binding(
-                                get: { workdays.contains(weekday) },
-                                set: { isSelected in
-                                    if isSelected {
-                                        workdays.insert(weekday)
-                                    } else {
-                                        workdays.remove(weekday)
-                                    }
-                                }
-                            )
-                        )
-                    }
+                Section {
+                    daysActiveSelector
                 }
 
                 Section("Reminder Preferences") {
@@ -231,8 +217,52 @@ struct SetUpView: View {
             Text(errorMessage ?? "")
         }
     }
-}
 
+    private var daysActiveSelector: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Days Active")
+                .font(.title2.weight(.bold))
+                .foregroundStyle(.primary)
+
+            HStack(spacing: 8) {
+                ForEach(Weekday.mondayFirst) { weekday in
+                    dayButton(for: weekday)
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.secondary.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+        .listRowBackground(Color.clear)
+    }
+
+    private func dayButton(for weekday: Weekday) -> some View {
+        let isActive = workdays.contains(weekday)
+
+        return Button {
+            if isActive {
+                workdays.remove(weekday)
+            } else {
+                workdays.insert(weekday)
+            }
+        } label: {
+            Text(String(weekday.shortTitle.prefix(1)))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(isActive ? .white : .primary)
+                .frame(width: 44, height: 44)
+                .background(isActive ? Color.accentColor : Color.secondary.opacity(0.16))
+                .clipShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(weekday.title)
+        .accessibilityValue(isActive ? "Active" : "Inactive")
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+    }
+
+}
 
 #Preview {
     SetUpView()
