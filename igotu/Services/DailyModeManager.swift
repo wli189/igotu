@@ -23,7 +23,8 @@ struct DailyModeManager {
         
         if isTime(currentMinutes, between: sleepStart, and: sleepEnd) {
             return .sleeping
-        } else if isTime(currentMinutes, between: workStart, and: workEnd) {
+        } else if isTime(currentMinutes, between: workStart, and: workEnd)
+                    && isWorkday(for: date, in: schedule.workdays) {
             return .work
         } else {
             return .idle
@@ -37,6 +38,14 @@ struct DailyModeManager {
     
     private func minutes(for components: DateComponents) -> Int {
         (components.hour ?? 0) * 60 + (components.minute ?? 0)
+    }
+
+    private func isWorkday(for date: Date, in workdays: Set<Weekday>) -> Bool {
+        guard let weekday = Weekday(rawValue: calendar.component(.weekday, from: date)) else {
+            return false
+        }
+
+        return workdays.contains(weekday)
     }
     
     private func isTime(

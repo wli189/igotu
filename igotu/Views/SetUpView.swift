@@ -17,6 +17,7 @@ struct SetUpView: View {
     @State private var sleepEnd = Self.time(hour: 7)
     @State private var workStart = Self.time(hour: 9)
     @State private var workEnd = Self.time(hour: 18)
+    @State private var workdays = Weekday.defaultWorkdays
     @State private var errorMessage: String?
     @State private var hasLoadedSavedSchedule = false
 
@@ -51,6 +52,7 @@ struct SetUpView: View {
         sleepEnd = Self.time(from: configuration.schedule.sleepEnd)
         workStart = Self.time(from: configuration.schedule.workStart)
         workEnd = Self.time(from: configuration.schedule.workEnd)
+        workdays = configuration.schedule.workdays
         hasLoadedSavedSchedule = true
     }
     
@@ -108,7 +110,8 @@ struct SetUpView: View {
             sleepStart: components(from: sleepStart),
             sleepEnd: components(from: sleepEnd),
             workStart: components(from: workStart),
-            workEnd: components(from: workEnd)
+            workEnd: components(from: workEnd),
+            workdays: workdays
         )
         
         if let message = validationMessage(for: schedule) {
@@ -149,6 +152,24 @@ struct SetUpView: View {
                         selection: $workEnd,
                         displayedComponents: .hourAndMinute
                     )
+                }
+
+                Section("Work Days") {
+                    ForEach(Weekday.allCases) { weekday in
+                        Toggle(
+                            weekday.title,
+                            isOn: Binding(
+                                get: { workdays.contains(weekday) },
+                                set: { isSelected in
+                                    if isSelected {
+                                        workdays.insert(weekday)
+                                    } else {
+                                        workdays.remove(weekday)
+                                    }
+                                }
+                            )
+                        )
+                    }
                 }
 
                 Section("Reminder Preferences") {
