@@ -224,7 +224,9 @@ struct SetUpView: View {
                 .font(.title2.weight(.bold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
-                .fixedSize(horizontal: false, vertical: true)
+                .fixedSize()
+                .padding(.horizontal, 4)
+                .padding(.vertical, 4)
 
             HStack(spacing: 6) {
                 ForEach(Weekday.mondayFirst) { weekday in
