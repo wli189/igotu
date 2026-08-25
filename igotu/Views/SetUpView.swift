@@ -223,13 +223,16 @@ struct SetUpView: View {
             Text("Days Active")
                 .font(.title2.weight(.bold))
                 .foregroundStyle(.primary)
+                .lineLimit(1)
+                .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 ForEach(Weekday.mondayFirst) { weekday in
                     dayButton(for: weekday)
                 }
             }
-            .padding(20)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.secondary.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
@@ -252,11 +255,12 @@ struct SetUpView: View {
             Text(String(weekday.shortTitle.prefix(1)))
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(isActive ? .white : .primary)
-                .frame(width: 44, height: 44)
+                .frame(width: 40, height: 40)
                 .background(isActive ? Color.accentColor : Color.secondary.opacity(0.16))
                 .clipShape(Circle())
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
         .accessibilityLabel(weekday.title)
         .accessibilityValue(isActive ? "Active" : "Inactive")
         .accessibilityAddTraits(isActive ? .isSelected : [])
