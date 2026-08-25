@@ -49,7 +49,7 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         try await center.requestAuthorization(options: [.alert, .sound])
     }
 
-    func schedule(_ candidate: ReminderCandidate) async throws {
+    func schedule(_ candidate: ReminderCandidate) async throws -> UUID? {
         await cancelExistingPendingReminder()
 
         let event = history?.recordScheduled(
@@ -88,6 +88,7 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
 
         do {
             try await center.add(request)
+            return event?.id
         } catch {
             if let event {
                 history?.updateStatus(for: event.id, to: .cancelled)
@@ -96,13 +97,12 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         }
     }
 
-    func scheduleIfNeeded(_ candidate: ReminderCandidate) async throws {
+    func scheduleIfNeeded(_ candidate: ReminderCandidate) async throws -> UUID? {
         let pendingRequests = await center.pendingNotificationRequests()
         guard let pendingRequest = pendingRequests.first(where: {
             $0.identifier == Self.nextReminderIdentifier
         }) else {
-            try await schedule(candidate)
-            return
+            return try await schedule(candidate)
         }
 
         let isCurrentCandidate =
@@ -110,10 +110,10 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
             && pendingRequest.content.userInfo["mode"] as? String == modeKey(for: candidate.mode)
 
         guard !isCurrentCandidate else {
-            return
+            return eventID(from: pendingRequest.content.userInfo)
         }
 
-        try await schedule(candidate)
+        return try await schedule(candidate)
     }
 
     func scheduleSleepReminderIfNeeded(
@@ -142,6 +142,12 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
 
     func cancelPendingReminder() async {
         await cancelExistingPendingReminder()
+    }
+
+    func removePendingReminder() {
+        center.removePendingNotificationRequests(
+            withIdentifiers: [Self.nextReminderIdentifier]
+        )
     }
 
     func cancelSleepReminder() {

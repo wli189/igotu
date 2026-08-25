@@ -278,6 +278,15 @@ The first version can track user-confirmed reminders without reading health data
 
 Step totals and automatic activity detection require HealthKit and are deferred.
 
+## Interactive Live Activity Reminders
+
+The next reminder is presented as a Live Activity with a countdown and direct actions:
+
+- Done confirms the behavior and records it in reminder history.
+- Skip dismisses the reminder without counting it toward a daily goal.
+
+The App Group action queue lets the Live Activity Extension write the user's choice while the app is not in the foreground. Local notifications remain scheduled as a fallback for devices or system states where a Live Activity cannot be started.
+
 ---
 
 # Home Screen
@@ -572,7 +581,8 @@ The first version should stay intentionally small.
 - [ ] Predefined behaviors
 - [ ] Enable/disable behaviors
 - [ ] Independent reminder frequency for Work and Idle
-- [ ] Local notifications
+- [x] Local notifications
+- [x] Interactive Live Activity reminders
 
 ### Phase 2 — Smart Reminders
 
