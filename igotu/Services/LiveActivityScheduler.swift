@@ -3,8 +3,6 @@ import Foundation
 
 @MainActor
 final class LiveActivityScheduler {
-    private let activityStaleGracePeriod: TimeInterval = 30 * 60
-
     private var history: ReminderHistoryStore?
 
     func configure(history: ReminderHistoryStore) {
@@ -39,8 +37,18 @@ final class LiveActivityScheduler {
 
     func startIfNeeded(
         for candidate: ReminderCandidate,
-        eventID: UUID
+        eventID: UUID,
+        now: Date = .now
     ) async {
+        let secondsUntilDue = candidate.dueAt.timeIntervalSince(now)
+        guard
+            secondsUntilDue <= ReminderTiming.liveActivityLeadTime,
+            secondsUntilDue > -ReminderTiming.liveActivityGracePeriod
+        else {
+            await endAll()
+            return
+        }
+
         if let currentActivity,
            currentActivity.attributes.eventID == eventID {
             return
@@ -64,7 +72,9 @@ final class LiveActivityScheduler {
         )
         let content = ActivityContent(
             state: state,
-            staleDate: candidate.dueAt.addingTimeInterval(activityStaleGracePeriod)
+            staleDate: candidate.dueAt.addingTimeInterval(
+                ReminderTiming.liveActivityGracePeriod
+            )
         )
 
         do {

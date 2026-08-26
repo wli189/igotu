@@ -90,7 +90,10 @@ final class ReminderCoordinator {
                 for: configuration.schedule,
                 now: now
             )
-            history.expireScheduledEvents(before: now)
+            history.expireScheduledEvents(
+                before: now,
+                gracePeriod: ReminderTiming.liveActivityGracePeriod
+            )
 
             let candidates = engine.nextReminders(from: ReminderEngineInput(
                 now: now,

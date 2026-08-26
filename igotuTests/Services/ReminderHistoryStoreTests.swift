@@ -103,4 +103,54 @@ struct ReminderHistoryStoreTests {
         #expect(store.events.first?.id == event.id)
         #expect(store.events.first?.status == .expired)
     }
+
+    @Test func scheduledEventsExpireAfterGracePeriod() {
+        let suiteName = "ReminderHistoryGracePeriodTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = ReminderHistoryStore(defaults: defaults)
+        let now = Date()
+        let event = store.recordScheduled(
+            behavior: .hydration,
+            context: .work,
+            dueAt: now,
+            now: now
+        )
+
+        store.expireScheduledEvents(
+            before: now.addingTimeInterval(29 * 60),
+            gracePeriod: 30 * 60
+        )
+        #expect(store.status(for: event.id) == .scheduled)
+
+        store.expireScheduledEvents(
+            before: now.addingTimeInterval(30 * 60),
+            gracePeriod: 30 * 60
+        )
+        #expect(store.status(for: event.id) == .expired)
+    }
+
+    @Test func deliveredEventsExpireAfterGracePeriod() {
+        let suiteName = "ReminderHistoryDeliveredExpirationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = ReminderHistoryStore(defaults: defaults)
+        let now = Date()
+        let event = store.recordScheduled(
+            behavior: .standUp,
+            context: .work,
+            dueAt: now,
+            now: now
+        )
+        store.updateStatus(for: event.id, to: .delivered, at: now)
+
+        store.expireScheduledEvents(
+            before: now.addingTimeInterval(30 * 60),
+            gracePeriod: 30 * 60
+        )
+
+        #expect(store.status(for: event.id) == .expired)
+    }
 }

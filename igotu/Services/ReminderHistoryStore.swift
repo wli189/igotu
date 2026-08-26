@@ -69,13 +69,17 @@ final class ReminderHistoryStore: ObservableObject {
     }
 
     func expireScheduledEvents(
-        before date: Date = .now
+        before date: Date = .now,
+        gracePeriod: TimeInterval = 0
     ) {
         var events = currentEvents(now: date)
         var didChange = false
 
-        for index in events.indices where events[index].status == .scheduled {
-            guard events[index].timestamp <= date else { continue }
+        for index in events.indices where
+            events[index].status == .scheduled || events[index].status == .delivered
+        {
+            let expirationDate = events[index].timestamp.addingTimeInterval(gracePeriod)
+            guard expirationDate <= date else { continue }
 
             events[index].status = .expired
             events[index].resolvedAt = date
