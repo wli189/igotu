@@ -16,17 +16,22 @@ struct WellnessReminderLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.leading) {
                     ActivitySymbol(
                         icon: context.attributes.icon,
-                        tint: context.attributes.theme.activityAccent
+                        tint: context.attributes.theme.activityAccent,
+                        size: 22,
+                        containerSize: 44
                     )
+                    .padding(.leading, 8)
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
-                    CountdownView(dueAt: context.state.dueAt)
+                    ReminderTimeStatusView(dueAt: context.state.dueAt)
                         .foregroundStyle(context.attributes.theme.activityForeground)
+                        .padding(.trailing, 8)
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
                     LiveActivityExpandedContent(context: context)
+                        .padding(.horizontal, 8)
                 }
             } compactLeading: {
                 ActivitySymbol(
@@ -34,8 +39,8 @@ struct WellnessReminderLiveActivity: Widget {
                     tint: context.attributes.theme.activityAccent
                 )
             } compactTrailing: {
-                CountdownView(dueAt: context.state.dueAt)
-                    .foregroundStyle(context.attributes.theme.activityForeground)
+                RemainingTimeView(dueAt: context.state.dueAt, font: .caption)
+                    .frame(width: 36, alignment: .trailing)
             } minimal: {
                 LiveActivityMinimalView(context: context)
             }
@@ -70,14 +75,8 @@ private struct LiveActivityLockScreenView: View {
 
                 Spacer(minLength: 8)
 
-                VStack(alignment: .trailing, spacing: 2) {
-                    CountdownView(dueAt: context.state.dueAt, font: .title3)
-                        .foregroundStyle(context.attributes.theme.activityForeground)
-
-                    Text("until due")
-                        .font(.caption2)
-                        .foregroundStyle(context.attributes.theme.activitySecondaryForeground)
-                }
+                ReminderTimeStatusView(dueAt: context.state.dueAt, font: .headline)
+                    .foregroundStyle(context.attributes.theme.activityForeground)
             }
 
             Text(context.attributes.message)
@@ -91,7 +90,7 @@ private struct LiveActivityLockScreenView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             context.attributes.theme.activityBackground,
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
         )
     }
 }
@@ -100,15 +99,16 @@ private struct LiveActivityExpandedContent: View {
     let context: ActivityViewContext<WellnessReminderAttributes>
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(context.attributes.behavior)
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(context.attributes.theme.activityForeground)
+                .lineLimit(1)
 
             Text(context.attributes.message)
-                .font(.caption)
+                .font(.caption2)
                 .foregroundStyle(context.attributes.theme.activitySecondaryForeground)
-                .lineLimit(2)
+                .lineLimit(1)
 
             LiveActivityActionContent(context: context, compact: true)
         }
@@ -123,14 +123,14 @@ private struct LiveActivityActionContent: View {
     var body: some View {
         switch context.state.status {
         case .pending:
-            HStack(spacing: 10) {
+            HStack(spacing: compact ? 6 : 10) {
                 Button(
                     intent: CompleteWellnessReminderIntent(
                         eventID: context.attributes.eventID.uuidString
                     )
                 ) {
                     Label("Done", systemImage: "checkmark")
-                        .font(.subheadline.weight(.semibold))
+                        .font((compact ? Font.caption : Font.subheadline).weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -145,14 +145,14 @@ private struct LiveActivityActionContent: View {
                     )
                 ) {
                     Label("Skip", systemImage: "forward.end")
-                        .font(.subheadline.weight(.semibold))
+                        .font((compact ? Font.caption : Font.subheadline).weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .tint(context.attributes.theme.activityAccent)
                 .accessibilityLabel("Skip " + context.attributes.behavior)
             }
-            .controlSize(compact ? .small : .regular)
+            .controlSize(compact ? .mini : .regular)
 
         case .acknowledged:
             StatusView(
@@ -200,7 +200,7 @@ private struct ActivitySymbol: View {
     }
 }
 
-private struct CountdownView: View {
+private struct RemainingTimeView: View {
     let dueAt: Date
     var font: Font = .caption2
 
@@ -213,30 +213,73 @@ private struct CountdownView: View {
     }
 }
 
+private struct ReminderTimeStatusView: View {
+    let dueAt: Date
+    var font: Font = .subheadline
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            Text(status(at: context.date))
+                .font(font.weight(.semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+    }
+
+    private func status(at date: Date) -> String {
+        let secondsUntilDue = dueAt.timeIntervalSince(date)
+
+        if secondsUntilDue > 60 {
+            let minutes = max(1, Int(ceil(secondsUntilDue / 60)))
+            return "In \(minutes) min"
+        }
+
+        if secondsUntilDue >= -60 {
+            return "Now"
+        }
+
+        return "Overdue"
+    }
+}
+
 private struct LiveActivityMinimalView: View {
     let context: ActivityViewContext<WellnessReminderAttributes>
 
     var body: some View {
-        VStack(spacing: 1) {
-            Image(systemName: context.state.status == .pending
-                ? context.attributes.icon
-                : context.state.status == .acknowledged ? "checkmark" : "arrow.uturn.forward")
-                .font(.system(size: 12, weight: .bold))
+        Image(systemName: icon)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(tint)
+            .frame(width: 24, height: 24)
+            .accessibilityLabel(accessibilityLabel)
+    }
 
-            if context.state.status == .pending {
-                Text(context.state.dueAt, style: .timer)
-                    .font(.system(size: 8, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-            }
+    private var icon: String {
+        switch context.state.status {
+        case .pending:
+            return context.attributes.icon
+        case .acknowledged:
+            return "checkmark.circle.fill"
+        case .skipped:
+            return "arrow.uturn.forward.circle"
         }
-        .foregroundStyle(context.attributes.theme.activityAccent)
-        .frame(width: 36, height: 30)
-        .accessibilityLabel(
-            context.state.status == .pending
-                ? context.attributes.behavior + " reminder"
-                : context.state.status == .acknowledged ? "Done" : "Skipped"
-        )
+    }
+
+    private var tint: Color {
+        context.state.status == .skipped
+            ? context.attributes.theme.activitySecondaryForeground
+            : context.attributes.theme.activityAccent
+    }
+
+    private var accessibilityLabel: String {
+        switch context.state.status {
+        case .pending:
+            return context.attributes.behavior + " reminder"
+        case .acknowledged:
+            return "Done"
+        case .skipped:
+            return "Skipped"
+        }
     }
 }
 
@@ -266,6 +309,13 @@ extension WellnessReminderAttributes.ContentState {
             dueAt: Date.now.addingTimeInterval(4 * 60)
         )
     }
+
+    fileprivate static var acknowledgedPreview: Self {
+        Self(
+            status: .acknowledged,
+            dueAt: Date.now
+        )
+    }
 }
 
 #Preview("Live Activity", as: .content, using: WellnessReminderAttributes.preview) {
@@ -290,4 +340,10 @@ extension WellnessReminderAttributes.ContentState {
     WellnessReminderLiveActivity()
 } contentStates: {
     WellnessReminderAttributes.ContentState.preview
+}
+
+#Preview("Dynamic Island Minimal Done", as: .dynamicIsland(.minimal), using: WellnessReminderAttributes.preview) {
+    WellnessReminderLiveActivity()
+} contentStates: {
+    WellnessReminderAttributes.ContentState.acknowledgedPreview
 }
