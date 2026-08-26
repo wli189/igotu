@@ -12,8 +12,9 @@ final class LiveActivityScheduler {
     }
 
     @discardableResult
-    func synchronizeActions() -> Bool {
+    func synchronizeActions() -> Set<UUID> {
         let actions = LiveActivityActionStore.consume()
+        var eventIDs = Set<UUID>()
 
         for action in actions {
             let status: ReminderEventStatus
@@ -30,9 +31,10 @@ final class LiveActivityScheduler {
                 to: status,
                 at: action.date
             )
+            eventIDs.insert(action.eventID)
         }
 
-        return !actions.isEmpty
+        return eventIDs
     }
 
     func startIfNeeded(

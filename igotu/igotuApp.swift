@@ -9,25 +9,30 @@ import SwiftUI
 
 @main
 struct igotuApp: App {
-    @StateObject private var configuration = AppConfigurationStore()
+    @StateObject private var configuration: AppConfigurationStore
     @Environment(\.scenePhase) private var scenePhase
 
-    private let modeManager = DailyModeManager()
-    private let engine = ReminderEngine()
     private let history: ReminderHistoryStore
-    private let notificationScheduler: NotificationScheduler
-    private let liveActivityScheduler: LiveActivityScheduler
+    private let reminderCoordinator: ReminderCoordinator
 
     init() {
+        let configuration = AppConfigurationStore()
         let history = ReminderHistoryStore()
+        let modeManager = DailyModeManager()
+        let engine = ReminderEngine()
         let notificationScheduler = NotificationScheduler()
         let liveActivityScheduler = LiveActivityScheduler()
 
+        _configuration = StateObject(wrappedValue: configuration)
         self.history = history
-        self.notificationScheduler = notificationScheduler
-        self.liveActivityScheduler = liveActivityScheduler
-        notificationScheduler.configure(history: history)
-        liveActivityScheduler.configure(history: history)
+        self.reminderCoordinator = ReminderCoordinator(
+            configuration: configuration,
+            modeManager: modeManager,
+            engine: engine,
+            history: history,
+            notificationScheduler: notificationScheduler,
+            liveActivityScheduler: liveActivityScheduler
+        )
     }
 
     var body: some Scene {
@@ -43,13 +48,13 @@ struct igotuApp: App {
             .environmentObject(history)
             .task(id: configuration.hasCompletedSetup) {
                 guard configuration.hasCompletedSetup else { return }
-                await refreshNotification(replacePending: true)
+                await reminderCoordinator.refresh(replacePending: true)
             }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active, configuration.hasCompletedSetup else { return }
 
                 Task {
-                    await refreshNotification(replacePending: false)
+                    await reminderCoordinator.refresh(replacePending: false)
                 }
             }
             .onChange(of: configuration.schedule) { _, _ in
@@ -68,88 +73,7 @@ struct igotuApp: App {
         guard configuration.hasCompletedSetup else { return }
 
         Task {
-            await refreshNotification(replacePending: true)
-        }
-    }
-
-    private func refreshNotification(replacePending: Bool) async {
-        let didSynchronizeActions = liveActivityScheduler.synchronizeActions()
-        if didSynchronizeActions {
-            notificationScheduler.removePendingReminder()
-        }
-
-        do {
-            _ = try? await notificationScheduler.requestPermission()
-
-            let mode = modeManager.currentMode(for: configuration.schedule)
-            let rules: [ReminderRule]
-
-            switch mode {
-            case .sleeping:
-                await notificationScheduler.cancelPendingReminder()
-                notificationScheduler.cancelSleepReminder()
-                await liveActivityScheduler.endAll()
-                return
-            case .work:
-                rules = configuration.workReminders
-            case .idle:
-                rules = configuration.idleReminders
-            }
-
-            try? await notificationScheduler.scheduleSleepReminderIfNeeded(
-                for: configuration.schedule
-            )
-
-            guard let candidate = engine.nextReminder(from: ReminderEngineInput(
-                now: .now,
-                mode: mode,
-                rules: rules,
-                recentEvents: history.recentEvents(
-                    since: .now.addingTimeInterval(-30 * 24 * 60 * 60)
-                )
-            )) else {
-                await notificationScheduler.cancelPendingReminder()
-                await liveActivityScheduler.endAll()
-                return
-            }
-
-            if replacePending {
-                await liveActivityScheduler.endAll()
-            }
-
-            let eventID: UUID?
-            do {
-                if replacePending {
-                    eventID = try await notificationScheduler.schedule(candidate)
-                } else {
-                    eventID = try await notificationScheduler.scheduleIfNeeded(candidate)
-                }
-            } catch {
-                // A Live Activity can still work when local notification scheduling fails.
-                eventID = history.recordScheduled(
-                    behavior: candidate.behavior,
-                    context: reminderContext(for: mode),
-                    dueAt: candidate.dueAt
-                ).id
-            }
-
-            if let eventID {
-                await liveActivityScheduler.startIfNeeded(
-                    for: candidate,
-                    eventID: eventID
-                )
-            }
-        } catch {
-            // Scheduling failures should not prevent the app from opening.
-        }
-    }
-
-    private func reminderContext(for mode: DailyMode) -> ReminderContext {
-        switch mode {
-        case .work:
-            return .work
-        case .idle, .sleeping:
-            return .idle
+            await reminderCoordinator.refresh(replacePending: true)
         }
     }
 }

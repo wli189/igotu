@@ -25,8 +25,12 @@ struct ReminderEngine {
     }
 
     func nextReminder(from input: ReminderEngineInput) -> ReminderCandidate? {
+        nextReminders(from: input).first
+    }
+
+    func nextReminders(from input: ReminderEngineInput) -> [ReminderCandidate] {
         guard let context = context(for: input.mode) else {
-            return nil
+            return []
         }
 
         let lastEventByBehavior = Dictionary(
@@ -53,7 +57,7 @@ struct ReminderEngine {
                     dueAt: dueAt
                 )
             }
-            .min { first, second in
+            .sorted { first, second in
                 if first.dueAt != second.dueAt {
                     return first.dueAt < second.dueAt
                 }

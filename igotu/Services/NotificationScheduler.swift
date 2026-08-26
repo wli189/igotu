@@ -3,24 +3,40 @@ import UserNotifications
 
 @MainActor
 final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationCenterDelegate {
-    private static let nextReminderIdentifier = "next-reminder"
+    private static let legacyNextReminderIdentifier = "next-reminder"
+    private static let reminderIdentifierPrefix = "wellness-reminder-"
     private static let sleepReminderIdentifier = "sleep-reminder"
     private static let sleepReminderLeadTime: TimeInterval = 30 * 60
     private static let reminderCategoryIdentifier = "wellness-reminder"
     private static let acknowledgeActionIdentifier = "acknowledge-reminder"
     private static let skipActionIdentifier = "skip-reminder"
-    private static let eventIDKey = "eventID"
+
+    private enum UserInfoKey {
+        static let eventID = "eventID"
+        static let behavior = "behavior"
+        static let mode = "mode"
+        static let dueAt = "dueAt"
+    }
+
+    private enum SchedulerError: Error {
+        case historyNotConfigured
+    }
 
     private let center: UNUserNotificationCenter
     private var history: ReminderHistoryStore?
+    private var onReminderAction: (() -> Void)?
 
     init(center: UNUserNotificationCenter = .current()) {
         self.center = center
         super.init()
     }
 
-    func configure(history: ReminderHistoryStore) {
+    func configure(
+        history: ReminderHistoryStore,
+        onReminderAction: (() -> Void)? = nil
+    ) {
         self.history = history
+        self.onReminderAction = onReminderAction
         center.delegate = self
 
         let actions = [
@@ -49,70 +65,76 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         try await center.requestAuthorization(options: [.alert, .sound])
     }
 
-    func schedule(_ candidate: ReminderCandidate) async throws -> UUID? {
-        await cancelExistingPendingReminder()
+    func reconcile(
+        _ candidates: [ReminderCandidate],
+        replacingExisting: Bool
+    ) async throws -> [(candidate: ReminderCandidate, eventID: UUID)] {
+        let pendingRequests = await pendingDailyRequests()
 
-        let event = history?.recordScheduled(
-            behavior: candidate.behavior,
-            context: reminderContext(for: candidate.mode),
-            dueAt: candidate.dueAt
-        )
+        if replacingExisting {
+            await cancel(requests: pendingRequests)
+        } else {
+            let desiredKeys = Set(candidates.map {
+                reminderKey(behavior: $0.behavior, mode: $0.mode)
+            })
+            let staleRequests = pendingRequests.filter { request in
+                guard
+                    let behavior = behavior(from: request.content.userInfo),
+                    let mode = modeKey(from: request.content.userInfo)
+                else {
+                    return true
+                }
 
-        let content = UNMutableNotificationContent()
-        content.title = candidate.behavior.title
-        content.body = message(for: candidate.behavior)
-        content.sound = .default
-        content.categoryIdentifier = Self.reminderCategoryIdentifier
-        var userInfo: [AnyHashable: Any] = [
-            "behavior": candidate.behavior.rawValue,
-            "mode": modeKey(for: candidate.mode)
-        ]
-        if let event {
-            userInfo[Self.eventIDKey] = event.id.uuidString
-        }
-        content.userInfo = userInfo
-
-        let secondsUntilReminder = max(
-            1,
-            candidate.dueAt.timeIntervalSinceNow
-        )
-        let trigger = UNTimeIntervalNotificationTrigger(
-            timeInterval: secondsUntilReminder,
-            repeats: false
-        )
-        let request = UNNotificationRequest(
-            identifier: Self.nextReminderIdentifier,
-            content: content,
-            trigger: trigger
-        )
-
-        do {
-            try await center.add(request)
-            return event?.id
-        } catch {
-            if let event {
-                history?.updateStatus(for: event.id, to: .cancelled)
+                return !desiredKeys.contains(
+                    reminderKey(behavior: behavior, modeKey: mode)
+                )
             }
-            throw error
+            await cancel(requests: staleRequests)
         }
+
+        var scheduledReminders: [(candidate: ReminderCandidate, eventID: UUID)] = []
+
+        for candidate in candidates {
+            if let eventID = try await scheduleIfNeeded(candidate) {
+                scheduledReminders.append((candidate: candidate, eventID: eventID))
+            }
+        }
+
+        return scheduledReminders
     }
 
     func scheduleIfNeeded(_ candidate: ReminderCandidate) async throws -> UUID? {
-        let pendingRequests = await center.pendingNotificationRequests()
-        guard let pendingRequest = pendingRequests.first(where: {
-            $0.identifier == Self.nextReminderIdentifier
-        }) else {
+        let pendingRequests = await pendingDailyRequests()
+        let matchingRequests = pendingRequests.filter { request in
+            guard
+                let behavior = behavior(from: request.content.userInfo),
+                let mode = modeKey(from: request.content.userInfo)
+            else {
+                return false
+            }
+
+            return behavior == candidate.behavior
+                && mode == modeKey(for: candidate.mode)
+        }
+
+        guard let currentRequest = matchingRequests.first else {
             return try await schedule(candidate)
         }
 
-        let isCurrentCandidate =
-            pendingRequest.content.userInfo["behavior"] as? String == candidate.behavior.rawValue
-            && pendingRequest.content.userInfo["mode"] as? String == modeKey(for: candidate.mode)
-
-        guard !isCurrentCandidate else {
-            return eventID(from: pendingRequest.content.userInfo)
+        if matchingRequests.count > 1 {
+            await cancel(requests: Array(matchingRequests.dropFirst()))
         }
 
+        if
+            currentRequest.identifier != Self.legacyNextReminderIdentifier,
+            let eventID = eventID(from: currentRequest.content.userInfo),
+            let status = history?.status(for: eventID),
+            !status.isTerminal
+        {
+            return eventID
+        }
+
+        await cancel(requests: [currentRequest])
         return try await schedule(candidate)
     }
 
@@ -140,13 +162,23 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         }
     }
 
-    func cancelPendingReminder() async {
-        await cancelExistingPendingReminder()
+    func cancelPendingReminders() async {
+        let requests = await pendingDailyRequests()
+        await cancel(requests: requests)
     }
 
-    func removePendingReminder() {
+    func removePendingReminders(for eventIDs: Set<UUID>) async {
+        let pendingRequests = await pendingDailyRequests()
+        let requests = pendingRequests.filter { request in
+            guard let eventID = eventID(from: request.content.userInfo) else {
+                return false
+            }
+
+            return eventIDs.contains(eventID)
+        }
+
         center.removePendingNotificationRequests(
-            withIdentifiers: [Self.nextReminderIdentifier]
+            withIdentifiers: requests.map(\.identifier)
         )
     }
 
@@ -161,7 +193,7 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        updateEventStatus(
+        _ = updateEventStatus(
             from: notification.request.content.userInfo,
             to: .delivered
         )
@@ -187,24 +219,62 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
             return
         }
 
-        updateEventStatus(
+        guard updateEventStatus(
             from: response.notification.request.content.userInfo,
             to: status
-        )
+        ) != nil else {
+            completionHandler()
+            return
+        }
+
+        onReminderAction?()
         completionHandler()
     }
 
-    private func cancelExistingPendingReminder() async {
-        let pendingRequests = await center.pendingNotificationRequests()
-        if let pendingRequest = pendingRequests.first(where: {
-            $0.identifier == Self.nextReminderIdentifier
-        }), let eventID = eventID(from: pendingRequest.content.userInfo) {
-            history?.updateStatus(for: eventID, to: .cancelled)
+    private func schedule(_ candidate: ReminderCandidate) async throws -> UUID? {
+        guard let history else {
+            throw SchedulerError.historyNotConfigured
         }
 
-        center.removePendingNotificationRequests(
-            withIdentifiers: [Self.nextReminderIdentifier]
+        let event = history.recordScheduled(
+            behavior: candidate.behavior,
+            context: reminderContext(for: candidate.mode),
+            dueAt: candidate.dueAt
         )
+
+        let content = UNMutableNotificationContent()
+        content.title = candidate.behavior.title
+        content.body = message(for: candidate.behavior)
+        content.sound = .default
+        content.categoryIdentifier = Self.reminderCategoryIdentifier
+        content.userInfo = [
+            UserInfoKey.eventID: event.id.uuidString,
+            UserInfoKey.behavior: candidate.behavior.rawValue,
+            UserInfoKey.mode: modeKey(for: candidate.mode),
+            UserInfoKey.dueAt: candidate.dueAt.timeIntervalSince1970
+        ]
+
+        let secondsUntilReminder = max(
+            1,
+            candidate.dueAt.timeIntervalSinceNow
+        )
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: secondsUntilReminder,
+            repeats: false
+        )
+        let request = UNNotificationRequest(
+            identifier: Self.reminderIdentifier(for: event.id),
+            content: content,
+            trigger: trigger
+        )
+
+        do {
+            try await center.add(request)
+            return event.id
+        } catch {
+            history.updateStatus(for: event.id, to: .cancelled)
+            throw error
+        }
     }
 
     private func scheduleSleepReminder(at sleepStart: Date, now: Date) async throws {
@@ -265,22 +335,75 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         }
     }
 
+    private func pendingDailyRequests() async -> [UNNotificationRequest] {
+        await center.pendingNotificationRequests().filter {
+            Self.isDailyReminderIdentifier($0.identifier)
+        }
+    }
+
+    private func cancel(requests: [UNNotificationRequest]) async {
+        guard !requests.isEmpty else { return }
+
+        for request in requests {
+            if let eventID = eventID(from: request.content.userInfo) {
+                history?.updateStatus(for: eventID, to: .cancelled)
+            }
+        }
+
+        center.removePendingNotificationRequests(
+            withIdentifiers: requests.map(\.identifier)
+        )
+    }
+
+    private func reminderKey(behavior: Behavior, mode: DailyMode) -> String {
+        reminderKey(behavior: behavior, modeKey: modeKey(for: mode))
+    }
+
+    private func reminderKey(behavior: Behavior, modeKey: String) -> String {
+        "\(behavior.rawValue):\(modeKey)"
+    }
+
     private func updateEventStatus(
         from userInfo: [AnyHashable: Any],
         to status: ReminderEventStatus
-    ) {
-        guard let eventID = eventID(from: userInfo) else { return }
+    ) -> UUID? {
+        guard let eventID = eventID(from: userInfo) else { return nil }
         history?.updateStatus(for: eventID, to: status)
+        return eventID
     }
 
     private func eventID(from userInfo: [AnyHashable: Any]) -> UUID? {
         guard
-            let value = userInfo[Self.eventIDKey] as? String,
+            let value = userInfo[UserInfoKey.eventID] as? String,
             let eventID = UUID(uuidString: value)
         else {
             return nil
         }
 
         return eventID
+    }
+
+    private func behavior(from userInfo: [AnyHashable: Any]) -> Behavior? {
+        guard
+            let value = userInfo[UserInfoKey.behavior] as? String,
+            let behavior = Behavior(rawValue: value)
+        else {
+            return nil
+        }
+
+        return behavior
+    }
+
+    private func modeKey(from userInfo: [AnyHashable: Any]) -> String? {
+        userInfo[UserInfoKey.mode] as? String
+    }
+
+    private static func reminderIdentifier(for eventID: UUID) -> String {
+        "\(reminderIdentifierPrefix)\(eventID.uuidString)"
+    }
+
+    private static func isDailyReminderIdentifier(_ identifier: String) -> Bool {
+        identifier == legacyNextReminderIdentifier
+            || identifier.hasPrefix(reminderIdentifierPrefix)
     }
 }

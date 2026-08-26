@@ -63,4 +63,44 @@ struct ReminderHistoryStoreTests {
 
         #expect(store.recentEvents(since: now.addingTimeInterval(-60), now: now).isEmpty)
     }
+
+    @Test func terminalEventsCannotBeOverwrittenByDelayedCallbacks() {
+        let suiteName = "ReminderHistoryTerminalStateTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = ReminderHistoryStore(defaults: defaults)
+        let now = Date()
+        let event = store.recordScheduled(
+            behavior: .hydration,
+            context: .work,
+            dueAt: now,
+            now: now
+        )
+
+        store.updateStatus(for: event.id, to: .acknowledged, at: now)
+        store.updateStatus(for: event.id, to: .delivered, at: now.addingTimeInterval(1))
+
+        #expect(store.events.first?.status == .acknowledged)
+    }
+
+    @Test func overdueScheduledEventsExpire() {
+        let suiteName = "ReminderHistoryExpirationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = ReminderHistoryStore(defaults: defaults)
+        let now = Date()
+        let event = store.recordScheduled(
+            behavior: .movement,
+            context: .idle,
+            dueAt: now.addingTimeInterval(-60),
+            now: now.addingTimeInterval(-60)
+        )
+
+        store.expireScheduledEvents(before: now)
+
+        #expect(store.events.first?.id == event.id)
+        #expect(store.events.first?.status == .expired)
+    }
 }

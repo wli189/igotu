@@ -5,7 +5,17 @@ enum ReminderEventStatus: String, Codable {
     case delivered
     case acknowledged
     case skipped
+    case expired
     case cancelled
+
+    var isTerminal: Bool {
+        switch self {
+        case .acknowledged, .skipped, .expired, .cancelled:
+            return true
+        case .scheduled, .delivered:
+            return false
+        }
+    }
 
     var countsTowardCompletion: Bool {
         self == .acknowledged
@@ -15,7 +25,7 @@ enum ReminderEventStatus: String, Codable {
         switch self {
         case .scheduled, .delivered, .acknowledged:
             return true
-        case .skipped, .cancelled:
+        case .skipped, .expired, .cancelled:
             return false
         }
     }

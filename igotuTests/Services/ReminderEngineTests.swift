@@ -121,6 +121,16 @@ struct ReminderEngineTests {
         #expect(result?.behavior == .standUp)
     }
 
+    @Test func enabledRulesProduceOneCandidatePerBehavior() {
+        let result = engine.nextReminders(from: input(rules: [
+            ReminderRule(behavior: .hydration, isEnabled: true, frequency: .regular),
+            ReminderRule(behavior: .standUp, isEnabled: true, frequency: .regular),
+            ReminderRule(behavior: .movement, isEnabled: true, frequency: .regular)
+        ]))
+
+        #expect(result.map(\.behavior) == [.standUp, .hydration, .movement])
+    }
+
     private func input(
         mode: DailyMode = .work,
         rules: [ReminderRule] = [

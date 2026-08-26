@@ -25,6 +25,10 @@ final class ReminderHistoryStore: ObservableObject {
         }
     }
 
+    func status(for eventID: UUID) -> ReminderEventStatus? {
+        events.first { $0.id == eventID }?.status
+    }
+
     func recordScheduled(
         behavior: Behavior,
         context: ReminderContext,
@@ -51,9 +55,36 @@ final class ReminderHistoryStore: ObservableObject {
             return
         }
 
+        guard !events[index].status.isTerminal else {
+            return
+        }
+
+        guard events[index].status != status else {
+            return
+        }
+
         events[index].status = status
         events[index].resolvedAt = date
         persist(events, now: date)
+    }
+
+    func expireScheduledEvents(
+        before date: Date = .now
+    ) {
+        var events = currentEvents(now: date)
+        var didChange = false
+
+        for index in events.indices where events[index].status == .scheduled {
+            guard events[index].timestamp <= date else { continue }
+
+            events[index].status = .expired
+            events[index].resolvedAt = date
+            didChange = true
+        }
+
+        if didChange {
+            persist(events, now: date)
+        }
     }
 
     func cancelScheduledEvents(
