@@ -124,67 +124,28 @@ struct SetUpView: View {
     }
     
     var body: some View {
-        NavigationStack{
-            Form {
-                Section(header: Text("Sleep Time")) {
-                    DatePicker(
-                        "Bedtimes",
-                        selection: $sleepStart,
-                        displayedComponents: .hourAndMinute
-                    )
-                    
-                    DatePicker(
-                        "Wake up",
-                        selection: $sleepEnd,
-                        displayedComponents: .hourAndMinute
-                    )
-                }
-                
-                Section(header: Text("Work Time")) {
-                    DatePicker(
-                        "Work starts",
-                        selection: $workStart,
-                        displayedComponents: .hourAndMinute
-                    )
-                    
-                    DatePicker(
-                        "Work ends",
-                        selection: $workEnd,
-                        displayedComponents: .hourAndMinute
-                    )
-                }
-
-                Section {
-                    daysActiveSelector
-                }
-
-                Section("Reminder Preferences") {
-                    NavigationLink("Work Reminders") {
-                        ReminderSettingsView(context: .work)
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    if !isEditing {
+                        onboardingHeader
                     }
 
-                    NavigationLink("Idle Reminders") {
-                        ReminderSettingsView(context: .idle)
-                    }
+                    scheduleSection
+                    reminderSection
+                    dailyGoalsSection
                 }
-
-                Section("Daily Goals") {
-                    NavigationLink("Water and Standing") {
-                        DailyGoalsSettingsView()
-                    }
-                }
-                
-                if !isEditing {
-                    Section {
-                        Button("Continue") {
-                            if save() {
-                                dismiss()
-                            }
-                        }
-                    }
-                }
+                .padding(.horizontal, 20)
+                .padding(.top, isEditing ? 16 : 20)
+                .padding(.bottom, isEditing ? 24 : 12)
+            }
+            .scrollIndicators(.hidden)
+            .background {
+                Color(.systemGroupedBackground)
+                    .ignoresSafeArea()
             }
             .navigationTitle(isEditing ? "Schedule" : "Stay well")
+            .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 if isEditing {
                     ToolbarItem(placement: .cancellationAction) {
@@ -207,6 +168,11 @@ struct SetUpView: View {
                     }
                 }
             }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if !isEditing {
+                    continueFooter
+                }
+            }
             .onAppear {
                 loadSavedSchedule()
             }
@@ -224,30 +190,230 @@ struct SetUpView: View {
         }
     }
 
-    private var daysActiveSelector: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Days Active")
-                .font(.title2.weight(.bold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .fixedSize()
-                .padding(.horizontal, 4)
-                .padding(.vertical, 4)
+    private var onboardingHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Build your daily rhythm")
+                .font(.title2.bold())
 
-            HStack(spacing: 6) {
+            Text("Set a schedule so reminders arrive at the right time.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var scheduleSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeading("Schedule", systemImage: "calendar")
+
+            groupedSurface {
+                VStack(spacing: 0) {
+                    scheduleGroup(
+                        title: "Sleep",
+                        systemImage: "moon.fill",
+                        firstLabel: "Bedtime",
+                        firstSelection: $sleepStart,
+                        secondLabel: "Wake up",
+                        secondSelection: $sleepEnd
+                    )
+
+                    Divider()
+                        .padding(.leading, 44)
+
+                    scheduleGroup(
+                        title: "Work",
+                        systemImage: "briefcase.fill",
+                        firstLabel: "Work starts",
+                        firstSelection: $workStart,
+                        secondLabel: "Work ends",
+                        secondSelection: $workEnd
+                    )
+
+                    Divider()
+                        .padding(.leading, 44)
+
+                    activeDaysContent
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+        }
+    }
+
+    private func scheduleGroup(
+        title: String,
+        systemImage: String,
+        firstLabel: String,
+        firstSelection: Binding<Date>,
+        secondLabel: String,
+        secondSelection: Binding<Date>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+                .foregroundStyle(.primary)
+                .padding(.bottom, 2)
+
+            DatePicker(
+                firstLabel,
+                selection: firstSelection,
+                displayedComponents: .hourAndMinute
+            )
+
+            DatePicker(
+                secondLabel,
+                selection: secondSelection,
+                displayedComponents: .hourAndMinute
+            )
+        }
+        .padding(.vertical, 12)
+    }
+
+    private var activeDaysContent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Active days", systemImage: "calendar.badge.clock")
+                .font(.headline)
+
+            Text("Choose when work reminders are active.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 4) {
                 ForEach(Weekday.mondayFirst) { weekday in
                     dayButton(for: weekday)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.secondary.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .padding(.top, 4)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-        .listRowBackground(Color.clear)
+        .padding(.vertical, 12)
+    }
+
+    private var reminderSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeading("Reminder preferences", systemImage: "bell.fill")
+
+            groupedSurface {
+                VStack(spacing: 0) {
+                    settingsLink(
+                        title: "Work reminders",
+                        subtitle: "During your work hours",
+                        systemImage: "briefcase.fill"
+                    ) {
+                        ReminderSettingsView(context: .work)
+                    }
+
+                    Divider()
+                        .padding(.leading, 62)
+
+                    settingsLink(
+                        title: "Idle reminders",
+                        subtitle: "When you are away from work",
+                        systemImage: "figure.walk"
+                    ) {
+                        ReminderSettingsView(context: .idle)
+                    }
+                }
+            }
+        }
+    }
+
+    private var dailyGoalsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeading("Daily goals", systemImage: "target")
+
+            groupedSurface {
+                settingsLink(
+                    title: "Water and standing",
+                    subtitle: "Set your daily targets",
+                    systemImage: "drop.fill"
+                ) {
+                    DailyGoalsSettingsView()
+                }
+            }
+        }
+    }
+
+    private func sectionHeading(_ title: String, systemImage: String) -> some View {
+        Label(title.uppercased(), systemImage: systemImage)
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+    }
+
+    private func groupedSurface<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            }
+    }
+
+    private func settingsLink<Destination: View>(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        @ViewBuilder destination: () -> Destination
+    ) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        Color.accentColor.opacity(0.12),
+                        in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    )
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
+
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var continueFooter: some View {
+        HStack {
+            Button {
+                if save() {
+                    dismiss()
+                }
+            } label: {
+                Label("Continue", systemImage: "arrow.right")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(Color.accentColor)
+            .controlSize(.large)
+            .frame(maxWidth: 360)
+            .shadow(color: .black.opacity(0.14), radius: 16, y: 8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
     }
 
     private func dayButton(for weekday: Weekday) -> some View {
@@ -261,11 +427,13 @@ struct SetUpView: View {
             }
         } label: {
             Text(String(weekday.shortTitle.prefix(1)))
-                .font(.title3.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(isActive ? .white : .primary)
-                .frame(width: 40, height: 40)
-                .background(isActive ? Color.accentColor : Color.secondary.opacity(0.16))
-                .clipShape(Circle())
+                .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
+                .background {
+                    Circle()
+                        .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.16))
+                }
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)

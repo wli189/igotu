@@ -285,7 +285,7 @@ Daily wellness behaviors are point-in-time reminders, but the current interactio
 - Done confirms the behavior and records it in reminder history.
 - Skip dismisses the reminder without counting it toward a daily goal.
 
-The Live Activity supports a lock screen layout, expanded Dynamic Island layout, compact Dynamic Island layout, and minimal Dynamic Island layout. The expanded and lock screen presentations show the behavior, current mode, countdown, and direct actions. Compact and minimal presentations only show the information that fits their smaller surfaces.
+The Live Activity supports a lock screen layout, expanded Dynamic Island layout, compact Dynamic Island layout, and minimal Dynamic Island layout. The lock screen is the primary surface and shows the current mode, behavior, time status (`In N min`, `Now`, or `Overdue`), a short prompt, and Done / Skip actions. Expanded Dynamic Island shows the icon, behavior, time status, prompt, and actions. Compact Dynamic Island shows only the icon and remaining time; minimal Dynamic Island shows one status icon, changing from the behavior icon to a checkmark when completed.
 
 Each daily behavior also has an event-specific local notification as a fallback. Different behaviors may have independent pending notifications, but only the most urgent event is promoted to the single Live Activity surface. Completing or skipping from either surface resolves the same event and removes the fallback notification.
 
