@@ -50,7 +50,8 @@ final class LiveActivityScheduler {
         }
 
         if let currentActivity,
-           currentActivity.attributes.eventID == eventID {
+           currentActivity.attributes.eventID == eventID,
+           currentActivity.attributes.theme == candidate.mode.wellnessTheme {
             return
         }
 
@@ -64,7 +65,8 @@ final class LiveActivityScheduler {
             eventID: eventID,
             behavior: candidate.behavior.title,
             icon: candidate.behavior.icon,
-            message: message(for: candidate.behavior)
+            message: message(for: candidate.behavior),
+            theme: candidate.mode.wellnessTheme
         )
         let state = WellnessReminderAttributes.ContentState(
             status: .pending,

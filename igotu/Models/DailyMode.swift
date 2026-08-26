@@ -36,11 +36,15 @@ enum DailyMode: Equatable {
         }
     }
 
-    var color: Color {
+    var wellnessTheme: WellnessTheme {
         switch self {
-        case .sleeping: return .indigo
-        case .work: return .green
-        case .idle: return .orange
+        case .sleeping: return .sleep
+        case .work: return .work
+        case .idle: return .home
         }
+    }
+
+    var color: Color {
+        wellnessTheme.accent
     }
 }

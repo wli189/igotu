@@ -17,4 +17,5 @@ struct WellnessReminderAttributes: ActivityAttributes {
     let behavior: String
     let icon: String
     let message: String
+    let theme: WellnessTheme
 }
