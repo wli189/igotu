@@ -4,10 +4,10 @@ import UserNotifications
 @MainActor
 final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationCenterDelegate {
     private static let legacyNextReminderIdentifier = "next-reminder"
-    private static let reminderIdentifierPrefix = "wellness-reminder-"
+    private static let reminderIdentifierPrefix = WellnessReminderNotification.identifierPrefix
     private static let sleepReminderIdentifier = "sleep-reminder"
     private static let sleepReminderLeadTime: TimeInterval = 30 * 60
-    private static let reminderCategoryIdentifier = "wellness-reminder"
+    private static let reminderCategoryIdentifier = WellnessReminderNotification.categoryIdentifier
     private static let acknowledgeActionIdentifier = "acknowledge-reminder"
     private static let skipActionIdentifier = "skip-reminder"
 
@@ -210,8 +210,14 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         switch response.actionIdentifier {
         case Self.acknowledgeActionIdentifier:
             status = .acknowledged
+            center.removeDeliveredNotifications(
+                withIdentifiers: [response.notification.request.identifier]
+            )
         case Self.skipActionIdentifier, UNNotificationDismissActionIdentifier:
             status = .skipped
+            center.removeDeliveredNotifications(
+                withIdentifiers: [response.notification.request.identifier]
+            )
         case UNNotificationDefaultActionIdentifier:
             status = .delivered
         default:
@@ -244,8 +250,10 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
 
         let content = UNMutableNotificationContent()
         content.title = candidate.behavior.title
+        content.subtitle = candidate.mode.title + " routine"
         content.body = message(for: candidate.behavior)
         content.sound = .default
+        content.threadIdentifier = Self.reminderCategoryIdentifier
         content.categoryIdentifier = Self.reminderCategoryIdentifier
         content.userInfo = [
             UserInfoKey.eventID: event.id.uuidString,
@@ -399,7 +407,7 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
     }
 
     private static func reminderIdentifier(for eventID: UUID) -> String {
-        "\(reminderIdentifierPrefix)\(eventID.uuidString)"
+        WellnessReminderNotification.identifier(for: eventID)
     }
 
     private static func isDailyReminderIdentifier(_ identifier: String) -> Bool {

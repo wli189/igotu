@@ -23,9 +23,9 @@ enum ReminderEventStatus: String, Codable {
 
     var countsTowardCooldown: Bool {
         switch self {
-        case .scheduled, .delivered, .acknowledged:
+        case .scheduled, .delivered, .acknowledged, .skipped, .expired:
             return true
-        case .skipped, .expired, .cancelled:
+        case .cancelled:
             return false
         }
     }
@@ -53,5 +53,18 @@ struct ReminderEvent: Identifiable, Codable, Equatable {
         self.timestamp = timestamp
         self.status = status
         self.resolvedAt = resolvedAt
+    }
+
+    func cooldownAnchor(expirationGracePeriod: TimeInterval) -> Date? {
+        switch status {
+        case .scheduled, .delivered:
+            return timestamp
+        case .acknowledged, .skipped:
+            return resolvedAt ?? timestamp
+        case .expired:
+            return timestamp.addingTimeInterval(expirationGracePeriod)
+        case .cancelled:
+            return nil
+        }
     }
 }

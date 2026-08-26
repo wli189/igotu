@@ -44,6 +44,63 @@ struct ReminderEngineTests {
         #expect(result?.dueAt == now.addingTimeInterval(60 * 60))
     }
 
+    @Test func acknowledgedEventUsesItsCompletionTime() {
+        let event = ReminderEvent(
+            behavior: .hydration,
+            context: .work,
+            timestamp: now.addingTimeInterval(-30 * 60),
+            status: .acknowledged,
+            resolvedAt: now.addingTimeInterval(-10 * 60)
+        )
+
+        let result = engine.nextReminder(from: input(
+            rules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .regular)
+            ],
+            recentEvents: [event]
+        ))
+
+        #expect(result?.dueAt == now.addingTimeInterval(50 * 60))
+    }
+
+    @Test func skippedEventUsesTheTimeItWasSkipped() {
+        let event = ReminderEvent(
+            behavior: .hydration,
+            context: .work,
+            timestamp: now.addingTimeInterval(-15 * 60),
+            status: .skipped,
+            resolvedAt: now.addingTimeInterval(-5 * 60)
+        )
+
+        let result = engine.nextReminder(from: input(
+            rules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .regular)
+            ],
+            recentEvents: [event]
+        ))
+
+        #expect(result?.dueAt == now.addingTimeInterval(55 * 60))
+    }
+
+    @Test func expiredEventUsesItsDueTimePlusTheGracePeriod() {
+        let event = ReminderEvent(
+            behavior: .hydration,
+            context: .work,
+            timestamp: now.addingTimeInterval(-30 * 60),
+            status: .expired,
+            resolvedAt: now
+        )
+
+        let result = engine.nextReminder(from: input(
+            rules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .regular)
+            ],
+            recentEvents: [event]
+        ))
+
+        #expect(result?.dueAt == now.addingTimeInterval(45 * 60))
+    }
+
     @Test func firstReminderIsScheduledAfterItsFrequencyInterval() {
         let result = engine.nextReminder(from: input(rules: [
             ReminderRule(behavior: .hydration, isEnabled: true, frequency: .regular)

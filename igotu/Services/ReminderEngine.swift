@@ -17,11 +17,16 @@ struct ReminderEngine {
     typealias OffsetProvider = (ReminderFrequency) -> TimeInterval
 
     private let offsetProvider: OffsetProvider
+    private let expirationGracePeriod: TimeInterval
 
-    init(offsetProvider: @escaping OffsetProvider = { frequency in
-        Double.random(in: frequency.offsetRange)
-    }) {
+    init(
+        offsetProvider: @escaping OffsetProvider = { frequency in
+            Double.random(in: frequency.offsetRange)
+        },
+        expirationGracePeriod: TimeInterval = ReminderTiming.liveActivityGracePeriod
+    ) {
         self.offsetProvider = offsetProvider
+        self.expirationGracePeriod = expirationGracePeriod
     }
 
     func nextReminder(from input: ReminderEngineInput) -> ReminderCandidate? {
@@ -33,13 +38,15 @@ struct ReminderEngine {
             return []
         }
 
-        let lastEventByBehavior = Dictionary(
+        let lastAnchorByBehavior = Dictionary(
             grouping: input.recentEvents.filter {
                 $0.context == context && $0.status.countsTowardCooldown
             },
             by: \.behavior
         ).compactMapValues { events in
-            events.max { $0.timestamp < $1.timestamp }
+            events.compactMap {
+                $0.cooldownAnchor(expirationGracePeriod: expirationGracePeriod)
+            }.max()
         }
 
         return input.rules
@@ -47,7 +54,7 @@ struct ReminderEngine {
             .compactMap { rule in
                 let dueAt = nextDueDate(
                     for: rule,
-                    lastEvent: lastEventByBehavior[rule.behavior],
+                    lastAnchor: lastAnchorByBehavior[rule.behavior],
                     now: input.now
                 )
 
@@ -68,10 +75,10 @@ struct ReminderEngine {
 
     private func nextDueDate(
         for rule: ReminderRule,
-        lastEvent: ReminderEvent?,
+        lastAnchor: Date?,
         now: Date
     ) -> Date {
-        guard let lastEvent else {
+        guard let lastAnchor else {
             return dueDate(
                 after: now,
                 frequency: rule.frequency,
@@ -80,7 +87,7 @@ struct ReminderEngine {
         }
 
         return dueDate(
-            after: lastEvent.timestamp,
+            after: lastAnchor,
             frequency: rule.frequency,
             now: now
         )

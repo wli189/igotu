@@ -278,14 +278,18 @@ The first version can track user-confirmed reminders without reading health data
 
 Step totals and automatic activity detection require HealthKit and are deferred.
 
-## Interactive Live Activity Reminders
+## Reminder Notifications and Live Activities
 
-The next reminder is presented as a Live Activity with a countdown and direct actions:
+Daily wellness behaviors are point-in-time reminders, but the current interaction uses one Live Activity as the active confirmation surface for the most urgent reminder. It appears during the five minutes before a reminder is due and remains available through the fifteen-minute grace period:
 
 - Done confirms the behavior and records it in reminder history.
 - Skip dismisses the reminder without counting it toward a daily goal.
 
-The App Group action queue lets the Live Activity Extension write the user's choice while the app is not in the foreground. Local notifications remain scheduled as a fallback for devices or system states where a Live Activity cannot be started.
+The Live Activity supports a lock screen layout, expanded Dynamic Island layout, compact Dynamic Island layout, and minimal Dynamic Island layout. The expanded and lock screen presentations show the behavior, current mode, countdown, and direct actions. Compact and minimal presentations only show the information that fits their smaller surfaces.
+
+Each daily behavior also has an event-specific local notification as a fallback. Different behaviors may have independent pending notifications, but only the most urgent event is promoted to the single Live Activity surface. Completing or skipping from either surface resolves the same event and removes the fallback notification.
+
+The App Group action queue lets the Live Activity extension persist a completion or skip action while the app is not in the foreground. The app consumes that queue on its next refresh and reconciles the schedule without requiring the user to reopen the app immediately.
 
 ---
 
@@ -363,7 +367,12 @@ A possible architecture:
           │            │            │
           └────────────┼────────────┘
                        ▼
-             Notification Scheduler
+            Reminder Coordinator
+                 │          │
+                 ▼          ▼
+       Local Notification   Live Activity
+             Adapter          Adapter
+          (fallback)       (current reminder)
 ```
 
 ---
@@ -521,7 +530,14 @@ Stand-up threshold:
 
 # Notification Strategy
 
-Notifications should be scheduled intelligently rather than generating a large number of fixed notifications.
+Notifications should be scheduled intelligently rather than generating a large number of fixed notifications. The most urgent point-in-time reminder is promoted to the Live Activity when possible; the matching local notification remains the system fallback.
+
+| Reminder type | Presentation | Policy |
+|---|---|---|
+| Drink Water, Stand Up, Movement | Live Activity with local notification fallback | One next pending reminder per enabled behavior; only the most urgent is promoted |
+| Sleep / Wind Down | Local notification | Separate from daily behavior reminders |
+| Daily progress summary | Future Live Activity | Show progress, not a countdown |
+| User-started ongoing task | Future Live Activity | Start when the task begins and end when it resolves |
 
 The system should consider:
 
@@ -533,9 +549,43 @@ The system should consider:
 - Whether the user already performed the behavior
 - Whether another reminder is already pending
 
+Multiple different behaviors may be pending at the same time. The current MVP has three daily behaviors, so it may have up to three normal pending reminders, while avoiding duplicate pending reminders for the same behavior. Each daily behavior notification must use an event-specific identifier so that resolving one reminder cannot cancel or modify another.
+
+When the user taps Done or Skip, the app should update the matching event and reconcile the schedule for that behavior. Foreground refresh, mode changes, sleep transitions, and settings changes should run the same reconciliation process. Only stale or ineligible events should be cancelled.
+
 The goal is:
 
 > **Fewer, more relevant notifications.**
+
+---
+
+# Reminder Event Lifecycle
+
+Every daily behavior reminder has one stable event identifier shared by reminder history, the local notification request, and any future interactive surface. Sleep / Wind Down remains a separate schedule-driven notification because it is not a daily behavior completion event.
+
+```text
+scheduled ──> delivered ──> acknowledged
+     │              │
+     │              ├──────> skipped
+     │              └──────> expired
+     │
+     └─────────────────────> cancelled
+```
+
+Terminal states are `acknowledged`, `skipped`, `expired`, and `cancelled`. Acknowledged events count toward daily goals; skipped, expired, and cancelled events do not. State updates must be idempotent so that repeated taps, notification dismissal, or a delayed background callback cannot change an already resolved event.
+
+The next-reminder cooldown uses a state-specific anchor: `scheduled` and `delivered` use the planned due time, `acknowledged` and `skipped` use the actual action time, `expired` uses the planned due time plus the grace period, and `cancelled` does not affect future reminders. This means completing or skipping a reminder starts the next interval from the user's action, while an expired reminder starts it from the end of its grace period.
+
+---
+
+# Notification Architecture Plan
+
+1. Make the reminder planner produce the next candidate for each enabled behavior instead of only one global candidate.
+2. Add a central Reminder Coordinator that reconciles the desired plan with pending local notifications and reminder history.
+3. Give every local notification an event-specific identifier and keep the sleep reminder in its own category.
+4. Route Done, Skip, dismissal, expiration, mode changes, and settings changes through the same event lifecycle.
+5. Promote the most urgent daily reminder to an interactive Live Activity within its lead time, while keeping its local notification as a fallback.
+6. Test independent pending reminders, event-specific actions, duplicate actions, background handling, mode changes, and migration of old Live Activities.
 
 ---
 
@@ -558,10 +608,12 @@ ModeBehavior
 └── frequency
 
 ReminderEvent
+├── id
 ├── behavior
-├── timestamp
-├── mode
-└── status
+├── context
+├── dueAt
+├── status
+└── resolvedAt
 ```
 
 This also allows the app to build a lightweight history later.
@@ -582,7 +634,8 @@ The first version should stay intentionally small.
 - [ ] Enable/disable behaviors
 - [ ] Independent reminder frequency for Work and Idle
 - [x] Local notifications
-- [x] Interactive Live Activity reminders
+- [x] Independent pending notifications for daily behaviors
+- [x] Interactive Live Activity for the current reminder
 
 ### Phase 2 — Smart Reminders
 
@@ -590,6 +643,8 @@ The first version should stay intentionally small.
 - [ ] Minimum intervals
 - [ ] Mode switching at sleep/work boundaries
 - [x] Reminder history
+- [x] Reminder event lifecycle and idempotent actions
+- [x] Central reminder coordinator
 - [ ] Activity-aware reminders
 - [x] Avoid duplicate reminders
 
@@ -661,11 +716,13 @@ Every notification should have a reason.
 
 The system should prefer:
 
-> One useful reminder
+> One relevant reminder per behavior
 
 over:
 
-> Five technically correct reminders.
+> Repeated or duplicated reminders for the same behavior.
+
+Different behaviors may be pending at the same time when each has a separate reason to remind the user.
 
 ---
 

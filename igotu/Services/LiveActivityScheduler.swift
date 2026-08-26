@@ -92,12 +92,8 @@ final class LiveActivityScheduler {
 
     func endAll() async {
         for activity in Activity<WellnessReminderAttributes>.activities {
-            let state = WellnessReminderAttributes.ContentState(
-                status: .skipped,
-                dueAt: activity.content.state.dueAt
-            )
             await activity.end(
-                ActivityContent(state: state, staleDate: nil),
+                ActivityContent(state: activity.content.state, staleDate: nil),
                 dismissalPolicy: .immediate
             )
         }

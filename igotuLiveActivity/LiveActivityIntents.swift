@@ -1,9 +1,18 @@
 import ActivityKit
 import AppIntents
+import UserNotifications
+
+private func removeFallbackNotification(for eventID: UUID) {
+    let identifier = WellnessReminderNotification.identifier(for: eventID)
+    let center = UNUserNotificationCenter.current()
+
+    center.removePendingNotificationRequests(withIdentifiers: [identifier])
+    center.removeDeliveredNotifications(withIdentifiers: [identifier])
+}
 
 struct CompleteWellnessReminderIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Complete Wellness Reminder"
-    static var supportedModes: IntentModes { .foreground(.dynamic) }
+    static var supportedModes: IntentModes { .background }
 
     @Parameter(title: "Event ID")
     var eventID: String
@@ -25,6 +34,7 @@ struct CompleteWellnessReminderIntent: LiveActivityIntent {
             eventID: eventID,
             status: .acknowledged
         )
+        removeFallbackNotification(for: eventID)
         await endActivity(eventID: eventID, status: .acknowledged)
         return .result()
     }
@@ -52,7 +62,7 @@ struct CompleteWellnessReminderIntent: LiveActivityIntent {
 
 struct SkipWellnessReminderIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Skip Wellness Reminder"
-    static var supportedModes: IntentModes { .foreground(.dynamic) }
+    static var supportedModes: IntentModes { .background }
 
     @Parameter(title: "Event ID")
     var eventID: String
@@ -74,6 +84,7 @@ struct SkipWellnessReminderIntent: LiveActivityIntent {
             eventID: eventID,
             status: .skipped
         )
+        removeFallbackNotification(for: eventID)
         await endActivity(eventID: eventID)
         return .result()
     }
