@@ -12,6 +12,7 @@ struct SetUpView: View {
     @Environment(\.dismiss) private var dismiss
 
     let isEditing: Bool
+    private let themeColorService = ThemeColorService()
 
     @State private var sleepStart = Self.time(hour: 23)
     @State private var sleepEnd = Self.time(hour: 7)
@@ -106,14 +107,8 @@ struct SetUpView: View {
     }
     
     private func save() -> Bool {
-        let schedule = DailySchedule(
-            sleepStart: components(from: sleepStart),
-            sleepEnd: components(from: sleepEnd),
-            workStart: components(from: workStart),
-            workEnd: components(from: workEnd),
-            workdays: workdays
-        )
-        
+        let schedule = currentSchedule
+
         if let message = validationMessage(for: schedule) {
             errorMessage = message
             return false
@@ -122,60 +117,75 @@ struct SetUpView: View {
         configuration.save(schedule: schedule)
         return true
     }
-    
+
+    private var currentSchedule: DailySchedule {
+        DailySchedule(
+            sleepStart: components(from: sleepStart),
+            sleepEnd: components(from: sleepEnd),
+            workStart: components(from: workStart),
+            workEnd: components(from: workEnd),
+            workdays: workdays
+        )
+    }
+
+    private func saveEditedScheduleIfNeeded() {
+        guard isEditing, hasLoadedSavedSchedule else { return }
+        guard currentSchedule != configuration.schedule else { return }
+
+        _ = save()
+    }
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 28) {
-                    if !isEditing {
-                        onboardingHeader
-                    }
+        let accent = themeColorService.currentColor(for: configuration.schedule)
 
-                    scheduleSection
-                    reminderSection
-                    dailyGoalsSection
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, isEditing ? 16 : 20)
-                .padding(.bottom, isEditing ? 24 : 12)
-            }
-            .scrollIndicators(.hidden)
-            .background {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
-            }
-            .navigationTitle(isEditing ? "Schedule" : "Stay well")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                if isEditing {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                        }
-                    }
+        setupContent(accent: accent)
+    }
 
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button {
-                            if save() {
-                                dismiss()
-                            }
-                        } label: {
-                            Image(systemName: "checkmark")
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                }
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
+    private func setupContent(accent: Color) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
                 if !isEditing {
-                    continueFooter
+                    onboardingHeader(accent: accent)
                 }
+
+                scheduleSection(accent: accent)
+                reminderSection(accent: accent)
+                dailyGoalsSection(accent: accent)
             }
-            .onAppear {
-                loadSavedSchedule()
+            .padding(.horizontal, 20)
+            .padding(.top, isEditing ? 16 : 20)
+            .padding(.bottom, isEditing ? 24 : 12)
+        }
+        .scrollIndicators(.hidden)
+        .background {
+            AmbientBackground(color: accent)
+        }
+        .tint(accent)
+        .navigationTitle(isEditing ? "Schedule" : "")
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(isEditing ? .visible : .hidden, for: .navigationBar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !isEditing {
+                continueFooter(accent: accent)
             }
+        }
+        .onAppear {
+            loadSavedSchedule()
+        }
+        .onChange(of: sleepStart) { _, _ in
+            saveEditedScheduleIfNeeded()
+        }
+        .onChange(of: sleepEnd) { _, _ in
+            saveEditedScheduleIfNeeded()
+        }
+        .onChange(of: workStart) { _, _ in
+            saveEditedScheduleIfNeeded()
+        }
+        .onChange(of: workEnd) { _, _ in
+            saveEditedScheduleIfNeeded()
+        }
+        .onChange(of: workdays) { _, _ in
+            saveEditedScheduleIfNeeded()
         }
         .alert(
             "Cannot Save Schedule",
@@ -190,21 +200,23 @@ struct SetUpView: View {
         }
     }
 
-    private var onboardingHeader: some View {
+    private func onboardingHeader(accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Build your daily rhythm")
-                .font(.title2.bold())
+            Image(systemName: "leaf.fill")
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(accent)
+                .frame(width: 48, height: 48)
+                .background(accent.opacity(0.12), in: Circle())
 
-            Text("Set a schedule so reminders arrive at the right time.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            Text("Build your daily rhythm")
+                .font(.system(size: 32, weight: .bold, design: .rounded))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var scheduleSection: some View {
+    private func scheduleSection(accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeading("Schedule", systemImage: "calendar")
+            sectionHeading("Schedule", systemImage: "calendar", accent: accent)
 
             groupedSurface {
                 VStack(spacing: 0) {
@@ -232,7 +244,7 @@ struct SetUpView: View {
                     Divider()
                         .padding(.leading, 44)
 
-                    activeDaysContent
+                    activeDaysContent(accent: accent)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -269,35 +281,30 @@ struct SetUpView: View {
         .padding(.vertical, 12)
     }
 
-    private var activeDaysContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func activeDaysContent(accent: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             Label("Active days", systemImage: "calendar.badge.clock")
                 .font(.headline)
 
-            Text("Choose when work reminders are active.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
             HStack(spacing: 4) {
                 ForEach(Weekday.mondayFirst) { weekday in
-                    dayButton(for: weekday)
+                    dayButton(for: weekday, accent: accent)
                 }
             }
-            .padding(.top, 4)
         }
         .padding(.vertical, 12)
     }
 
-    private var reminderSection: some View {
+    private func reminderSection(accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeading("Reminder preferences", systemImage: "bell.fill")
+            sectionHeading("Reminder preferences", systemImage: "bell.fill", accent: accent)
 
             groupedSurface {
                 VStack(spacing: 0) {
                     settingsLink(
                         title: "Work reminders",
-                        subtitle: "During your work hours",
-                        systemImage: "briefcase.fill"
+                        systemImage: "briefcase.fill",
+                        accent: accent
                     ) {
                         ReminderSettingsView(context: .work)
                     }
@@ -307,8 +314,8 @@ struct SetUpView: View {
 
                     settingsLink(
                         title: "Idle reminders",
-                        subtitle: "When you are away from work",
-                        systemImage: "figure.walk"
+                        systemImage: "figure.walk",
+                        accent: accent
                     ) {
                         ReminderSettingsView(context: .idle)
                     }
@@ -317,15 +324,15 @@ struct SetUpView: View {
         }
     }
 
-    private var dailyGoalsSection: some View {
+    private func dailyGoalsSection(accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeading("Daily goals", systemImage: "target")
+            sectionHeading("Daily goals", systemImage: "target", accent: accent)
 
             groupedSurface {
                 settingsLink(
                     title: "Water and standing",
-                    subtitle: "Set your daily targets",
-                    systemImage: "drop.fill"
+                    systemImage: "target",
+                    accent: accent
                 ) {
                     DailyGoalsSettingsView()
                 }
@@ -333,27 +340,27 @@ struct SetUpView: View {
         }
     }
 
-    private func sectionHeading(_ title: String, systemImage: String) -> some View {
+    private func sectionHeading(
+        _ title: String,
+        systemImage: String,
+        accent: Color
+    ) -> some View {
         Label(title.uppercased(), systemImage: systemImage)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(accent)
     }
 
     private func groupedSurface<Content: View>(
         @ViewBuilder content: () -> Content
     ) -> some View {
         content()
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-            }
+            .ambientSurface(cornerRadius: 24)
     }
 
     private func settingsLink<Destination: View>(
         title: String,
-        subtitle: String,
         systemImage: String,
+        accent: Color,
         @ViewBuilder destination: () -> Destination
     ) -> some View {
         NavigationLink {
@@ -362,22 +369,16 @@ struct SetUpView: View {
             HStack(spacing: 12) {
                 Image(systemName: systemImage)
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(accent)
                     .frame(width: 38, height: 38)
                     .background(
-                        Color.accentColor.opacity(0.12),
+                        accent.opacity(0.12),
                         in: RoundedRectangle(cornerRadius: 11, style: .continuous)
                     )
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.body.weight(.medium))
-                        .foregroundStyle(.primary)
-
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                Text(title)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(.primary)
 
                 Spacer(minLength: 8)
 
@@ -393,7 +394,7 @@ struct SetUpView: View {
         .buttonStyle(.plain)
     }
 
-    private var continueFooter: some View {
+    private func continueFooter(accent: Color) -> some View {
         HStack {
             Button {
                 if save() {
@@ -405,7 +406,7 @@ struct SetUpView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
-            .tint(Color.accentColor)
+            .tint(accent)
             .controlSize(.large)
             .frame(maxWidth: 360)
             .shadow(color: .black.opacity(0.14), radius: 16, y: 8)
@@ -414,9 +415,18 @@ struct SetUpView: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 12)
+        .background {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay(alignment: .top) {
+                    Divider()
+                        .opacity(0.35)
+                }
+                .ignoresSafeArea(edges: .bottom)
+        }
     }
 
-    private func dayButton(for weekday: Weekday) -> some View {
+    private func dayButton(for weekday: Weekday, accent: Color) -> some View {
         let isActive = workdays.contains(weekday)
 
         return Button {
@@ -428,11 +438,11 @@ struct SetUpView: View {
         } label: {
             Text(String(weekday.shortTitle.prefix(1)))
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isActive ? .white : .primary)
+                .foregroundStyle(isActive ? .white : accent)
                 .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
                 .background {
                     Circle()
-                        .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.16))
+                        .fill(isActive ? accent : accent.opacity(0.12))
                 }
         }
         .buttonStyle(.plain)
@@ -445,11 +455,15 @@ struct SetUpView: View {
 }
 
 #Preview {
-    SetUpView()
-        .environmentObject(AppConfigurationStore())
+    NavigationStack {
+        SetUpView()
+            .environmentObject(AppConfigurationStore())
+    }
 }
 
 #Preview("Editing") {
-    SetUpView(isEditing: true)
-        .environmentObject(AppConfigurationStore())
+    NavigationStack {
+        SetUpView(isEditing: true)
+            .environmentObject(AppConfigurationStore())
+    }
 }

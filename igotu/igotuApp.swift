@@ -39,9 +39,11 @@ struct igotuApp: App {
         WindowGroup {
             Group {
                 if configuration.hasCompletedSetup {
-                    TodayView()
+                    MainTabView()
                 } else {
-                    SetUpView()
+                    NavigationStack {
+                        SetUpView()
+                    }
                 }
             }
             .environmentObject(configuration)

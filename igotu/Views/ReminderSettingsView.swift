@@ -4,6 +4,7 @@ struct ReminderSettingsView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore
 
     let context: ReminderContext
+    private let themeColorService = ThemeColorService()
 
     private var rules: [ReminderRule] {
         context == .work
@@ -12,6 +13,8 @@ struct ReminderSettingsView: View {
     }
 
     var body: some View {
+        let accent = themeColorService.currentColor(for: configuration.schedule)
+
         Form {
             Section("Reminders") {
                 ForEach(rules) { rule in
@@ -19,7 +22,12 @@ struct ReminderSettingsView: View {
                 }
             }
         }
-        .navigationTitle("\(context.title) Reminders")
+        .scrollContentBackground(.hidden)
+        .background {
+            AmbientBackground(color: accent)
+        }
+        .tint(accent)
+        .navigationTitle(context.title)
     }
 
     private func reminderRow(for behavior: Behavior) -> some View {

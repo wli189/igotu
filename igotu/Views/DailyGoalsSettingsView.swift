@@ -2,13 +2,16 @@ import SwiftUI
 
 struct DailyGoalsSettingsView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore
+    private let themeColorService = ThemeColorService()
 
     var body: some View {
+        let accent = themeColorService.currentColor(for: configuration.schedule)
+
         Form {
             Section {
                 goalStepper(
-                    title: "Drink Water",
-                    subtitle: "Times per day",
+                    title: "Water",
+                    unit: "day",
                     value: Binding(
                         get: { configuration.dailyGoals.hydrationCount },
                         set: { updateGoals(hydrationCount: $0) }
@@ -17,8 +20,8 @@ struct DailyGoalsSettingsView: View {
                 )
 
                 goalStepper(
-                    title: "Stand Up",
-                    subtitle: "Different hours per day",
+                    title: "Standing hours",
+                    unit: "day",
                     value: Binding(
                         get: { configuration.dailyGoals.standingHours },
                         set: { updateGoals(standingHours: $0) }
@@ -26,24 +29,27 @@ struct DailyGoalsSettingsView: View {
                     range: DailyGoals.standingHoursRange
                 )
             } header: {
-                Text("Daily Targets")
-            } footer: {
-                Text("A standing hour counts once, even if you complete multiple reminders during that hour.")
+                Text("Daily targets")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            AmbientBackground(color: accent)
+        }
+        .tint(accent)
         .navigationTitle("Daily Goals")
     }
 
     private func goalStepper(
         title: String,
-        subtitle: String,
+        unit: String,
         value: Binding<Int>,
         range: ClosedRange<Int>
     ) -> some View {
         Stepper(value: value, in: range) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                Text("\(value.wrappedValue) \(subtitle)")
+                Text("\(value.wrappedValue)/\(unit)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

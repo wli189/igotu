@@ -5,8 +5,6 @@
 //  Created by Brian Li on 8/19/26.
 //
 
-import SwiftUI
-
 enum DailyMode: Equatable {
     case sleeping
     case work
@@ -17,14 +15,6 @@ enum DailyMode: Equatable {
         case .sleeping: return "Sleeping"
         case .work: return "Work"
         case .idle: return "Idle"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .sleeping: return "Ordinary reminders are paused"
-        case .work: return "Stay focused and take regular breaks"
-        case .idle: return "A gentler reminder schedule is active"
         }
     }
 
@@ -44,7 +34,4 @@ enum DailyMode: Equatable {
         }
     }
 
-    var color: Color {
-        wellnessTheme.accent
-    }
 }
