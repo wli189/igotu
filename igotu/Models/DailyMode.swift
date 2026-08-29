@@ -34,4 +34,21 @@ enum DailyMode: Equatable {
         }
     }
 
+    var key: String {
+        switch self {
+        case .sleeping: return "sleeping"
+        case .work: return "work"
+        case .idle: return "idle"
+        }
+    }
+
+    init?(key: String) {
+        switch key {
+        case "sleeping": self = .sleeping
+        case "work": self = .work
+        case "idle": self = .idle
+        default: return nil
+        }
+    }
+
 }

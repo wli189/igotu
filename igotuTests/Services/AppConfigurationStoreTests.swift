@@ -65,4 +65,46 @@ struct AppConfigurationStoreTests {
 
         #expect(restoredStore.dailyGoals == DailyGoals(hydrationCount: 10, standingHours: 12))
     }
+
+    @Test func normalizesSavedDailyGoalsOnLoad() throws {
+        let suiteName = "DailyGoalsNormalizationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let data = try JSONEncoder().encode(
+            DailyGoals(hydrationCount: 99, standingHours: -10)
+        )
+        defaults.set(data, forKey: "dailyGoals")
+
+        let store = AppConfigurationStore(defaults: defaults)
+
+        #expect(store.dailyGoals == DailyGoals(hydrationCount: 20, standingHours: 1))
+    }
+
+    @Test func fillsMissingRulesAndKeepsLastDuplicate() throws {
+        let suiteName = "ReminderRulesNormalizationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let savedRules = [
+            ReminderRule(behavior: .hydration, isEnabled: false, frequency: .frequent),
+            ReminderRule(behavior: .hydration, isEnabled: true, frequency: .occasional)
+        ]
+        defaults.set(
+            try JSONEncoder().encode(savedRules),
+            forKey: "workReminders"
+        )
+
+        let store = AppConfigurationStore(defaults: defaults)
+
+        #expect(store.workReminders.map(\.behavior) == Behavior.allCases)
+        #expect(store.reminderRule(for: .hydration, in: .work).isEnabled)
+        #expect(
+            store.reminderRule(for: .hydration, in: .work).frequency == .occasional
+        )
+        #expect(
+            store.reminderRule(for: .standUp, in: .work).frequency == .frequent
+        )
+        #expect(store.reminderRule(for: .movement, in: .work).isEnabled)
+    }
 }

@@ -84,18 +84,10 @@ final class AppConfigurationStore: ObservableObject {
     }
 
     func save(dailyGoals: DailyGoals) {
-        var sanitizedGoals = dailyGoals
-        sanitizedGoals.hydrationCount = min(
-            max(sanitizedGoals.hydrationCount, DailyGoals.hydrationRange.lowerBound),
-            DailyGoals.hydrationRange.upperBound
-        )
-        sanitizedGoals.standingHours = min(
-            max(sanitizedGoals.standingHours, DailyGoals.standingHoursRange.lowerBound),
-            DailyGoals.standingHoursRange.upperBound
-        )
+        let normalizedGoals = dailyGoals.normalized
 
-        self.dailyGoals = sanitizedGoals
-        if let data = try? JSONEncoder().encode(sanitizedGoals) {
+        self.dailyGoals = normalizedGoals
+        if let data = try? JSONEncoder().encode(normalizedGoals) {
             defaults.set(data, forKey: Key.dailyGoals)
         }
     }
@@ -103,6 +95,7 @@ final class AppConfigurationStore: ObservableObject {
     func reminderRule(for behavior: Behavior, in context: ReminderContext) -> ReminderRule {
         let rules = context == .work ? workReminders : idleReminders
         return rules.first { $0.behavior == behavior }
+            ?? Self.defaultReminderRules(for: context).first { $0.behavior == behavior }
             ?? ReminderRule(behavior: behavior, isEnabled: false, frequency: .regular)
     }
 
@@ -138,7 +131,7 @@ final class AppConfigurationStore: ObservableObject {
             return defaultValue
         }
 
-        return rules
+        return normalizedReminderRules(rules, defaultValue: defaultValue)
     }
 
     private static func loadDailyGoals(from defaults: UserDefaults) -> DailyGoals {
@@ -149,7 +142,30 @@ final class AppConfigurationStore: ObservableObject {
             return DailyGoals()
         }
 
-        return goals
+        return goals.normalized
+    }
+
+    private static func normalizedReminderRules(
+        _ rules: [ReminderRule],
+        defaultValue: [ReminderRule]
+    ) -> [ReminderRule] {
+        var rulesByBehavior: [Behavior: ReminderRule] = [:]
+
+        for rule in defaultValue {
+            rulesByBehavior[rule.behavior] = rule
+        }
+
+        for rule in rules {
+            rulesByBehavior[rule.behavior] = rule
+        }
+
+        return Behavior.allCases.compactMap { rulesByBehavior[$0] }
+    }
+
+    private static func defaultReminderRules(
+        for context: ReminderContext
+    ) -> [ReminderRule] {
+        context == .work ? defaultWorkReminders : defaultIdleReminders
     }
 
     private func update(_ rule: ReminderRule, in context: ReminderContext) {

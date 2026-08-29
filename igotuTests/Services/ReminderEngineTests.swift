@@ -44,6 +44,41 @@ struct ReminderEngineTests {
         #expect(result?.dueAt == now.addingTimeInterval(60 * 60))
     }
 
+    @Test func futureScheduledEventsDoNotDelayTheNextReminder() {
+        let event = ReminderEvent(
+            behavior: .hydration,
+            context: .work,
+            timestamp: now.addingTimeInterval(30 * 60),
+            status: .scheduled
+        )
+
+        let result = engine.nextReminder(from: input(
+            rules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .regular)
+            ],
+            recentEvents: [event]
+        ))
+
+        #expect(result?.dueAt == now.addingTimeInterval(60 * 60))
+    }
+
+    @Test func reminderAfterActiveIntervalIsNotScheduled() {
+        let interval = DailyScheduleInterval(
+            mode: .work,
+            start: now.addingTimeInterval(-10 * 60),
+            end: now.addingTimeInterval(45 * 60)
+        )
+
+        let result = engine.nextReminder(from: input(
+            activeInterval: interval,
+            rules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .regular)
+            ]
+        ))
+
+        #expect(result == nil)
+    }
+
     @Test func acknowledgedEventUsesItsCompletionTime() {
         let event = ReminderEvent(
             behavior: .hydration,
@@ -190,6 +225,7 @@ struct ReminderEngineTests {
 
     private func input(
         mode: DailyMode = .work,
+        activeInterval: DailyScheduleInterval? = nil,
         rules: [ReminderRule] = [
             ReminderRule(behavior: .hydration, isEnabled: true, frequency: .regular)
         ],
@@ -199,7 +235,8 @@ struct ReminderEngineTests {
             now: now,
             mode: mode,
             rules: rules,
-            recentEvents: recentEvents
+            recentEvents: recentEvents,
+            activeInterval: activeInterval
         )
     }
 }

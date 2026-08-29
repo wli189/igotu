@@ -22,8 +22,8 @@ struct ReminderHistoryStoreTests {
             now: now
         )
 
-        #expect(events == [event])
-        #expect(events.first?.status == .scheduled)
+        #expect(restoredStore.events == [event])
+        #expect(events.isEmpty)
     }
 
     @Test func acknowledgedEventsAreCountedAsCompleted() {
@@ -62,6 +62,27 @@ struct ReminderHistoryStoreTests {
         store.updateStatus(for: event.id, to: .cancelled, at: now)
 
         #expect(store.recentEvents(since: now.addingTimeInterval(-60), now: now).isEmpty)
+    }
+
+    @Test func reminderCompletedBeforeItsDueTimeStillAffectsCooldown() {
+        let suiteName = "ReminderHistoryEarlyCompletionTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = ReminderHistoryStore(defaults: defaults)
+        let now = Date()
+        let event = store.recordScheduled(
+            behavior: .hydration,
+            context: .work,
+            dueAt: now.addingTimeInterval(5 * 60),
+            now: now
+        )
+        store.updateStatus(for: event.id, to: .acknowledged, at: now)
+
+        #expect(
+            store.recentEvents(since: now.addingTimeInterval(-60), now: now)
+                .map(\.id) == [event.id]
+        )
     }
 
     @Test func terminalEventsCannotBeOverwrittenByDelayedCallbacks() {

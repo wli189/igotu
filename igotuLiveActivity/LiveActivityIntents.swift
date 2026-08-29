@@ -10,6 +10,54 @@ private func removeFallbackNotification(for eventID: UUID) {
     center.removeDeliveredNotifications(withIdentifiers: [identifier])
 }
 
+private func finishWellnessReminder(
+    eventIDString: String,
+    status: LiveActivityActionStatus
+) async {
+    guard let eventID = UUID(uuidString: eventIDString) else {
+        return
+    }
+
+    LiveActivityActionStore.record(
+        eventID: eventID,
+        status: status
+    )
+    removeFallbackNotification(for: eventID)
+
+    let reminderState: WellnessReminderAttributes.ReminderState
+    switch status {
+    case .acknowledged:
+        reminderState = .acknowledged
+    case .skipped:
+        reminderState = .skipped
+    }
+
+    await endActivity(
+        eventID: eventID,
+        status: reminderState
+    )
+}
+
+private func endActivity(
+    eventID: UUID,
+    status: WellnessReminderAttributes.ReminderState
+) async {
+    guard let activity = Activity<WellnessReminderAttributes>.activities.first(
+        where: { $0.attributes.eventID == eventID }
+    ) else {
+        return
+    }
+
+    let state = WellnessReminderAttributes.ContentState(
+        status: status,
+        dueAt: activity.content.state.dueAt
+    )
+    await activity.end(
+        ActivityContent(state: state, staleDate: nil),
+        dismissalPolicy: .immediate
+    )
+}
+
 struct CompleteWellnessReminderIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Complete Wellness Reminder"
     static var supportedModes: IntentModes { .background }
@@ -26,37 +74,11 @@ struct CompleteWellnessReminderIntent: LiveActivityIntent {
     }
 
     func perform() async throws -> some IntentResult {
-        guard let eventID = UUID(uuidString: eventID) else {
-            return .result()
-        }
-
-        LiveActivityActionStore.record(
-            eventID: eventID,
+        await finishWellnessReminder(
+            eventIDString: eventID,
             status: .acknowledged
         )
-        removeFallbackNotification(for: eventID)
-        await endActivity(eventID: eventID, status: .acknowledged)
         return .result()
-    }
-
-    private func endActivity(
-        eventID: UUID,
-        status: WellnessReminderAttributes.ReminderState
-    ) async {
-        guard let activity = Activity<WellnessReminderAttributes>.activities.first(
-            where: { $0.attributes.eventID == eventID }
-        ) else {
-            return
-        }
-
-        let state = WellnessReminderAttributes.ContentState(
-            status: status,
-            dueAt: activity.content.state.dueAt
-        )
-        await activity.end(
-            ActivityContent(state: state, staleDate: nil),
-            dismissalPolicy: .immediate
-        )
     }
 }
 
@@ -76,33 +98,10 @@ struct SkipWellnessReminderIntent: LiveActivityIntent {
     }
 
     func perform() async throws -> some IntentResult {
-        guard let eventID = UUID(uuidString: eventID) else {
-            return .result()
-        }
-
-        LiveActivityActionStore.record(
-            eventID: eventID,
+        await finishWellnessReminder(
+            eventIDString: eventID,
             status: .skipped
         )
-        removeFallbackNotification(for: eventID)
-        await endActivity(eventID: eventID)
         return .result()
-    }
-
-    private func endActivity(eventID: UUID) async {
-        guard let activity = Activity<WellnessReminderAttributes>.activities.first(
-            where: { $0.attributes.eventID == eventID }
-        ) else {
-            return
-        }
-
-        let state = WellnessReminderAttributes.ContentState(
-            status: .skipped,
-            dueAt: activity.content.state.dueAt
-        )
-        await activity.end(
-            ActivityContent(state: state, staleDate: nil),
-            dismissalPolicy: .immediate
-        )
     }
 }

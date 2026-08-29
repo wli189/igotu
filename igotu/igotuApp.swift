@@ -50,7 +50,7 @@ struct igotuApp: App {
             .environmentObject(history)
             .task(id: configuration.hasCompletedSetup) {
                 guard configuration.hasCompletedSetup else { return }
-                await reminderCoordinator.refresh(replacePending: true)
+                await reminderCoordinator.refresh(replacePending: false)
             }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active, configuration.hasCompletedSetup else { return }

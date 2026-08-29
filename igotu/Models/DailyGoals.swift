@@ -11,4 +11,17 @@ struct DailyGoals: Codable, Equatable {
         self.hydrationCount = hydrationCount
         self.standingHours = standingHours
     }
+
+    var normalized: DailyGoals {
+        DailyGoals(
+            hydrationCount: min(
+                max(hydrationCount, Self.hydrationRange.lowerBound),
+                Self.hydrationRange.upperBound
+            ),
+            standingHours: min(
+                max(standingHours, Self.standingHoursRange.lowerBound),
+                Self.standingHoursRange.upperBound
+            )
+        )
+    }
 }

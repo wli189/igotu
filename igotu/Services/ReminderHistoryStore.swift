@@ -7,7 +7,7 @@ final class ReminderHistoryStore: ObservableObject {
     }
 
     private let defaults: UserDefaults
-    private let retention: TimeInterval = 30 * 24 * 60 * 60
+    private let retention = ReminderTiming.historyRetention
 
     @Published private(set) var events: [ReminderEvent]
 
@@ -21,7 +21,17 @@ final class ReminderHistoryStore: ObservableObject {
         now: Date = .now
     ) -> [ReminderEvent] {
         currentEvents(now: now).filter {
-            $0.timestamp >= date && $0.status.countsTowardCooldown
+            guard
+                $0.timestamp >= date,
+                $0.status.countsTowardCooldown,
+                let anchor = $0.cooldownAnchor(
+                    expirationGracePeriod: ReminderTiming.liveActivityGracePeriod
+                )
+            else {
+                return false
+            }
+
+            return anchor <= now
         }
     }
 

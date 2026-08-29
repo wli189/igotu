@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-`igotu` is an iOS SwiftUI app prototype for a context-aware wellness reminder. The product concept is documented in [Context-Aware Wellness Reminder.md](Context-Aware%20Wellness%20Reminder.md), and the visual direction is documented in [DESIGN.md](DESIGN.md). The repository currently contains the default SwiftUI/SwiftData CRUD scaffold; the context, behavior, activity-awareness, reminder-engine, and notification-scheduling layers described in the product document are planned concepts, not implemented modules.
+`igotu` is an iOS SwiftUI app prototype for context-aware wellness reminders. The product concept is documented in [Context-Aware Wellness Reminder.md](Context-Aware%20Wellness%20Reminder.md), and the visual direction is documented in [DESIGN.md](DESIGN.md). The app stores its schedule, reminder rules, daily goals, and reminder history in `UserDefaults`, and uses local notifications plus a Live Activity for the next reminder.
 
 ## Development commands
 
@@ -20,29 +20,31 @@ xcodebuild -list -project igotu.xcodeproj
 # List available simulator/device destinations
 xcodebuild -showdestinations -project igotu.xcodeproj -scheme igotu
 
-# Build for the installed iPhone 17 / iOS 26.5 simulator
+# Build for a generic iOS device without signing
 xcodebuild -project igotu.xcodeproj \
   -scheme igotu \
-  -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' \
+  -destination 'generic/platform=iOS' \
+  -sdk iphoneos \
+  CODE_SIGNING_ALLOWED=NO \
   build
 
-# Run all unit and UI tests
+# Run all unit and UI tests on an available simulator
 xcodebuild -project igotu.xcodeproj \
   -scheme igotu \
-  -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' \
+  -destination 'platform=iOS Simulator,name=<available simulator>,OS=<available iOS>' \
   test
 
 # Run one Swift Testing unit test
 xcodebuild -project igotu.xcodeproj \
   -scheme igotu \
-  -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' \
+  -destination 'platform=iOS Simulator,name=<available simulator>,OS=<available iOS>' \
   -only-testing:igotuTests/igotuTests/example \
   test
 
 # Run one UI test method
 xcodebuild -project igotu.xcodeproj \
   -scheme igotu \
-  -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' \
+  -destination 'platform=iOS Simulator,name=<available simulator>,OS=<available iOS>' \
   -only-testing:igotuUITests/igotuUITests/testExample \
   test
 ```
@@ -53,10 +55,13 @@ Replace the simulator name/OS with a destination from `-showdestinations` when t
 
 ### Current implementation
 
-- `igotu/igotuApp.swift` is the `@main` SwiftUI entry point. It builds a persistent `SwiftData.ModelContainer` for `Item` and injects it into the `WindowGroup` with `.modelContainer(...)`.
-- `igotu/ContentView.swift` is currently the only app screen. It reads persisted `Item` models with `@Query`, displays them in a `NavigationSplitView`, and inserts/deletes items through the environment `modelContext`. Its preview uses an in-memory SwiftData container.
-- `igotu/Item.swift` is the only persisted domain model. It is an `@Model` class containing a `timestamp: Date`.
-- `igotu/Assets.xcassets` contains the generated app icon and accent-color catalogs. The Xcode project uses filesystem-synchronized groups, so Swift files added under the app or test directories are picked up by the project automatically.
+- `igotu/igotuApp.swift` is the `@main` SwiftUI entry point. It creates the configuration, history, reminder engine, notification scheduler, and Live Activity scheduler, then coordinates refreshes when setup or scene state changes.
+- `igotu/Models/` contains the schedule, mode, behavior, frequency, rule, goal, and reminder-event models. `DailyMode` and `Behavior` own their stable keys, display metadata, and reminder-specific values.
+- `igotu/Services/DailyScheduleTimeline.swift` is the single source of truth for schedule intervals, including sleep and work intervals that cross midnight. `DailyModeManager` and `DailyModeProgressCalculator` consume it.
+- `igotu/Services/ReminderEngine.swift` calculates deterministic candidates from rules and history. `ReminderPlanner` expands that calculation across future schedule intervals and preserves valid pending notifications during ordinary refreshes.
+- `igotu/Services/ReminderCoordinator.swift` orchestrates refreshes. `NotificationScheduler` owns local notification requests and event status callbacks; `LiveActivityScheduler` owns the next-reminder Live Activity. `igotuLiveActivity/LiveActivityIntents.swift` records actions through the shared app-group store and removes the matching fallback notification.
+- `igotu/Services/AppConfigurationStore.swift` persists configuration in `UserDefaults` and normalizes legacy or incomplete rules/goals on load. `ReminderHistoryStore` persists a bounded event history and applies cooldown, expiration, and completion rules.
+- `igotu/Assets.xcassets` contains the app icon and theme color catalogs. The Xcode project uses filesystem-synchronized groups, so Swift files added under app, extension, shared, or test directories are picked up automatically.
 
 ### Test targets
 
@@ -64,22 +69,22 @@ Replace the simulator name/OS with a destination from `-showdestinations` when t
 - `igotuUITests` uses XCTest/XCUIAutomation and launches the `igotu` application. The current files are Xcode-generated examples, including a launch screenshot and a launch-performance test.
 - Both test targets depend on the app target through the Xcode scheme; run them through `xcodebuild ... test` rather than invoking Swift Package Manager commands.
 
-### Intended product boundary
+### Product boundary
 
-When implementing the wellness product, use the product document's conceptual separation as the starting boundary:
+Keep platform effects behind their dedicated modules and keep schedule decisions testable through value-returning modules:
 
 ```text
 SwiftUI views
-    -> view models / presentation state
-    -> reminder engine
-       -> active-context resolution
-       -> behavior rules and frequency
-       -> activity state
-       -> notification scheduling
-    -> SwiftData persistence and iOS system services
+    -> configuration/history stores
+    -> reminder coordinator
+       -> schedule timeline and mode resolution
+       -> reminder planner and engine
+       -> notification scheduler
+       -> Live Activity scheduler
+           -> shared app-group action store
 ```
 
-The product document names the planned concepts `ContextManager`, `Behavior`, `ReminderRule`, `ReminderEngine`, an activity monitor, and a notification scheduler. Keep the engine responsible for the decision “should I remind the user right now?” and keep platform concerns such as HealthKit and notifications behind dedicated boundaries. Do not treat the architecture diagram as evidence that those types already exist.
+Keep `ReminderEngine` responsible for candidate calculation, `ReminderPlanner` responsible for schedule-aware expansion, and `ReminderCoordinator` responsible for orchestration. Inject `Calendar` and random-offset providers in tests; avoid recreating schedule math in views or platform adapters. When refreshing notifications, configuration changes use `replacePending: true`, while ordinary scene/action refreshes preserve valid pending requests.
 
 ### UI direction
 
@@ -89,8 +94,8 @@ New UI should follow the Ambient Calm specification in `DESIGN.md`: native Swift
 
 - Keep app code in `igotu/`, unit tests in `igotuTests/`, and UI tests in `igotuUITests/`; the synchronized Xcode groups make the directory location part of target membership.
 - Preserve SwiftUI previews with in-memory model containers so previews do not write to the persistent store.
-- Keep persistence changes aligned between the SwiftData model declarations and the `ModelContainer` schema in `igotuApp.swift`.
-- The repository has no `README.md`, `CLAUDE.md`, `AGENTS.md`, Cursor rules, or Copilot instructions to merge into this guidance.
+- Keep scheduling, time-zone, and configuration behavior covered by focused tests before changing shared modules.
+- The repository has no package manager, custom lint command, or separate generated source step. Use Xcode compiler warnings and `xcodebuild` for verification.
 
 ## External-agent configuration
 

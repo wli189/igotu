@@ -27,4 +27,23 @@ enum Behavior: String, CaseIterable, Codable, Identifiable {
         case .movement: return "figure.walk"
         }
     }
+
+    var reminderPriority: Int {
+        switch self {
+        case .standUp: return 0
+        case .hydration: return 1
+        case .movement: return 2
+        }
+    }
+
+    var reminderMessage: String {
+        switch self {
+        case .hydration:
+            return "Take a moment to drink some water."
+        case .standUp:
+            return "Stand up and stretch for a moment."
+        case .movement:
+            return "Take a short walk or move around."
+        }
+    }
 }

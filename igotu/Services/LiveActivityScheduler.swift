@@ -65,7 +65,7 @@ final class LiveActivityScheduler {
             eventID: eventID,
             behavior: candidate.behavior.title,
             icon: candidate.behavior.icon,
-            message: message(for: candidate.behavior),
+            message: candidate.behavior.reminderMessage,
             theme: candidate.mode.wellnessTheme
         )
         let state = WellnessReminderAttributes.ContentState(
@@ -103,14 +103,4 @@ final class LiveActivityScheduler {
         Activity<WellnessReminderAttributes>.activities.first
     }
 
-    private func message(for behavior: Behavior) -> String {
-        switch behavior {
-        case .hydration:
-            return "Take a moment to drink some water."
-        case .standUp:
-            return "Stand up and stretch for a moment."
-        case .movement:
-            return "Take a short walk or move around."
-        }
-    }
 }

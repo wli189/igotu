@@ -5,6 +5,21 @@ struct ReminderEngineInput {
     let mode: DailyMode
     let rules: [ReminderRule]
     let recentEvents: [ReminderEvent]
+    let activeInterval: DailyScheduleInterval?
+
+    init(
+        now: Date,
+        mode: DailyMode,
+        rules: [ReminderRule],
+        recentEvents: [ReminderEvent],
+        activeInterval: DailyScheduleInterval? = nil
+    ) {
+        self.now = now
+        self.mode = mode
+        self.rules = rules
+        self.recentEvents = recentEvents
+        self.activeInterval = activeInterval
+    }
 }
 
 struct ReminderCandidate: Equatable {
@@ -46,7 +61,7 @@ struct ReminderEngine {
         ).compactMapValues { events in
             events.compactMap {
                 $0.cooldownAnchor(expirationGracePeriod: expirationGracePeriod)
-            }.max()
+            }.filter { $0 <= input.now }.max()
         }
 
         return input.rules
@@ -58,18 +73,24 @@ struct ReminderEngine {
                     now: input.now
                 )
 
-                return ReminderCandidate(
+                let candidate = ReminderCandidate(
                     behavior: rule.behavior,
                     mode: input.mode,
                     dueAt: dueAt
                 )
+
+                guard isWithinActiveInterval(candidate, input: input) else {
+                    return nil
+                }
+
+                return candidate
             }
             .sorted { first, second in
                 if first.dueAt != second.dueAt {
                     return first.dueAt < second.dueAt
                 }
 
-                return priority(of: first.behavior) < priority(of: second.behavior)
+                return first.behavior.reminderPriority < second.behavior.reminderPriority
             }
     }
 
@@ -113,11 +134,14 @@ struct ReminderEngine {
         }
     }
 
-    private func priority(of behavior: Behavior) -> Int {
-        switch behavior {
-        case .standUp: return 0
-        case .hydration: return 1
-        case .movement: return 2
-        }
+    private func isWithinActiveInterval(
+        _ candidate: ReminderCandidate,
+        input: ReminderEngineInput
+    ) -> Bool {
+        guard let interval = input.activeInterval else { return true }
+
+        return interval.mode == candidate.mode
+            && interval.start <= candidate.dueAt
+            && candidate.dueAt < interval.end
     }
 }

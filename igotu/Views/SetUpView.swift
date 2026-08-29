@@ -13,6 +13,7 @@ struct SetUpView: View {
 
     let isEditing: Bool
     private let themeColorService = ThemeColorService()
+    private let scheduleValidator = DailyScheduleValidator()
 
     @State private var sleepStart = Self.time(hour: 23)
     @State private var sleepEnd = Self.time(hour: 7)
@@ -27,8 +28,8 @@ struct SetUpView: View {
     }
     
     private func components(from date: Date) -> DateComponents {
-            Calendar.current.dateComponents([.hour, .minute], from: date)
-        }
+        Calendar.current.dateComponents([.hour, .minute], from: date)
+    }
     
     private static func time(hour: Int) -> Date {
         Calendar.current.date(from: DateComponents(hour: hour))!
@@ -57,60 +58,11 @@ struct SetUpView: View {
         hasLoadedSavedSchedule = true
     }
     
-    private func minutes(from components: DateComponents) -> Int {
-        (components.hour ?? 0) * 60 + (components.minute ?? 0)
-    }
-
-    private func ranges(start: Int, end: Int) -> [Range<Int>] {
-        if start < end {
-            return [start..<end]
-        }
-
-        return [start..<1440, 0..<end]
-    }
-    
-    private func overlaps(
-        sleepStart: Int,
-        sleepEnd: Int,
-        workStart: Int,
-        workEnd: Int
-    ) -> Bool {
-        for rangeSleep in ranges(start: sleepStart, end: sleepEnd) {
-            for rangeWork in ranges(start: workStart, end: workEnd) {
-                if rangeSleep.lowerBound < rangeWork.upperBound && rangeSleep.upperBound > rangeWork.lowerBound {
-                    return true
-                }
-            }
-        }
-        return false
-    }
-    
-    private func validationMessage(for schedule: DailySchedule) -> String? {
-        let sleepStart = minutes(from: schedule.sleepStart)
-        let sleepEnd = minutes(from: schedule.sleepEnd)
-        let workStart = minutes(from: schedule.workStart)
-        let workEnd = minutes(from: schedule.workEnd)
-        
-        if sleepStart == sleepEnd {
-            return "Your bedtime and wake-up time cannot be the same."
-        }
-        
-        if workStart == workEnd {
-            return "Your work start time and end time cannot be the same."
-        }
-        
-        if overlaps(sleepStart: sleepStart, sleepEnd: sleepEnd, workStart: workStart, workEnd: workEnd) {
-            return "Your work hours and bedtime overlap."
-        }
-        
-        return nil
-    }
-    
     private func save() -> Bool {
         let schedule = currentSchedule
 
-        if let message = validationMessage(for: schedule) {
-            errorMessage = message
+        if let issue = scheduleValidator.issue(for: schedule) {
+            errorMessage = issue.message
             return false
         }
 

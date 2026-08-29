@@ -4,7 +4,7 @@ import Foundation
 final class ReminderCoordinator {
     private let configuration: AppConfigurationStore
     private let modeManager: DailyModeManager
-    private let engine: ReminderEngine
+    private let planner: ReminderPlanner
     private let history: ReminderHistoryStore
     private let notificationScheduler: NotificationScheduler
     private let liveActivityScheduler: LiveActivityScheduler
@@ -22,7 +22,7 @@ final class ReminderCoordinator {
     ) {
         self.configuration = configuration
         self.modeManager = modeManager
-        self.engine = engine
+        self.planner = ReminderPlanner(engine: engine)
         self.history = history
         self.notificationScheduler = notificationScheduler
         self.liveActivityScheduler = liveActivityScheduler
@@ -70,22 +70,14 @@ final class ReminderCoordinator {
         do {
             _ = try? await notificationScheduler.requestPermission()
 
-            let mode = modeManager.currentMode(for: configuration.schedule)
-            let rules: [ReminderRule]
-
-            switch mode {
-            case .sleeping:
-                await notificationScheduler.cancelPendingReminders()
-                notificationScheduler.cancelSleepReminder()
-                await liveActivityScheduler.endAll()
-                return
-            case .work:
-                rules = configuration.workReminders
-            case .idle:
-                rules = configuration.idleReminders
-            }
-
             let now = Date.now
+            let currentInterval = modeManager.currentInterval(
+                for: configuration.schedule,
+                at: now
+            )
+            let pendingReminders = replacePending
+                ? []
+                : await notificationScheduler.pendingReminders()
             try? await notificationScheduler.scheduleSleepReminderIfNeeded(
                 for: configuration.schedule,
                 now: now
@@ -95,20 +87,28 @@ final class ReminderCoordinator {
                 gracePeriod: ReminderTiming.liveActivityGracePeriod
             )
 
-            let candidates = engine.nextReminders(from: ReminderEngineInput(
-                now: now,
-                mode: mode,
-                rules: rules,
+            let candidates = planner.nextReminders(
+                for: configuration.schedule,
+                workRules: configuration.workReminders,
+                idleRules: configuration.idleReminders,
                 recentEvents: history.recentEvents(
-                    since: now.addingTimeInterval(-30 * 24 * 60 * 60),
+                    since: now.addingTimeInterval(-ReminderTiming.historyRetention),
                     now: now
-                )
-            ))
+                ),
+                pendingReminders: pendingReminders,
+                now: now
+            )
 
             let scheduledReminders = try await notificationScheduler.reconcile(
                 candidates,
                 replacingExisting: replacePending
             )
+
+            if currentInterval.mode == .sleeping {
+                notificationScheduler.cancelSleepReminder()
+                await liveActivityScheduler.endAll()
+                return
+            }
 
             guard let nextReminder = scheduledReminders.first else {
                 await liveActivityScheduler.endAll()

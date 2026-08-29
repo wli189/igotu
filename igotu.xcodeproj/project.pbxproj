@@ -371,6 +371,7 @@
 				CODE_SIGN_ENTITLEMENTS = igotuLiveActivity/igotuLiveActivity.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 932AJN75G8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "igotuLiveActivity-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
@@ -398,6 +399,7 @@
 				CODE_SIGN_ENTITLEMENTS = igotuLiveActivity/igotuLiveActivity.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 932AJN75G8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "igotuLiveActivity-Info.plist";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
@@ -545,6 +547,7 @@
 				CODE_SIGN_ENTITLEMENTS = igotu.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 932AJN75G8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
@@ -578,6 +581,7 @@
 				CODE_SIGN_ENTITLEMENTS = igotu.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 932AJN75G8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
