@@ -25,7 +25,7 @@ final class ReminderHistoryStore: ObservableObject {
                 $0.timestamp >= date,
                 $0.status.countsTowardCooldown,
                 let anchor = $0.cooldownAnchor(
-                    expirationGracePeriod: ReminderTiming.liveActivityGracePeriod
+                    expirationGracePeriod: ReminderTiming.expirationGracePeriod
                 )
             else {
                 return false

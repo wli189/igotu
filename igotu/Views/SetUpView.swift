@@ -106,7 +106,7 @@ struct SetUpView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, isEditing ? 16 : 20)
-            .padding(.bottom, isEditing ? 24 : 12)
+            .padding(.bottom, isEditing ? 24 : 96)
         }
         .scrollIndicators(.hidden)
         .background {
@@ -116,7 +116,7 @@ struct SetUpView: View {
         .navigationTitle(isEditing ? "Schedule" : "")
         .navigationBarTitleDisplayMode(.large)
         .toolbar(isEditing ? .visible : .hidden, for: .navigationBar)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .overlay(alignment: .bottom) {
             if !isEditing {
                 continueFooter(accent: accent)
             }
@@ -347,35 +347,24 @@ struct SetUpView: View {
     }
 
     private func continueFooter(accent: Color) -> some View {
-        HStack {
-            Button {
-                if save() {
-                    dismiss()
-                }
-            } label: {
-                Label("Continue", systemImage: "arrow.right")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
+        Button {
+            if save() {
+                dismiss()
             }
-            .buttonStyle(.glassProminent)
-            .tint(accent)
-            .controlSize(.large)
-            .frame(maxWidth: 360)
-            .shadow(color: .black.opacity(0.14), radius: 16, y: 8)
+        } label: {
+            Label("Continue", systemImage: "arrow.right")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
         }
-        .frame(maxWidth: .infinity)
+        .buttonStyle(.glassProminent)
+        .buttonBorderShape(.capsule)
+        .tint(accent)
+        .controlSize(.large)
+        .frame(maxWidth: 360)
+        .shadow(color: .black.opacity(0.14), radius: 16, y: 8)
         .padding(.horizontal, 20)
-        .padding(.top, 12)
         .padding(.bottom, 12)
-        .background {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .overlay(alignment: .top) {
-                    Divider()
-                        .opacity(0.35)
-                }
-                .ignoresSafeArea(edges: .bottom)
-        }
     }
 
     private func dayButton(for weekday: Weekday, accent: Color) -> some View {

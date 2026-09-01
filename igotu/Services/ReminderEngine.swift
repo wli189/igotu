@@ -38,7 +38,7 @@ struct ReminderEngine {
         offsetProvider: @escaping OffsetProvider = { frequency in
             Double.random(in: frequency.offsetRange)
         },
-        expirationGracePeriod: TimeInterval = ReminderTiming.liveActivityGracePeriod
+        expirationGracePeriod: TimeInterval = ReminderTiming.expirationGracePeriod
     ) {
         self.offsetProvider = offsetProvider
         self.expirationGracePeriod = expirationGracePeriod

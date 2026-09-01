@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-`igotu` is an iOS SwiftUI app prototype for context-aware wellness reminders. The product concept is documented in [Context-Aware Wellness Reminder.md](Context-Aware%20Wellness%20Reminder.md), and the visual direction is documented in [DESIGN.md](DESIGN.md). The app stores its schedule, reminder rules, daily goals, and reminder history in `UserDefaults`, and uses local notifications plus a Live Activity for the next reminder.
+`igotu` is an iOS SwiftUI app prototype for context-aware wellness reminders. The product concept is documented in [Context-Aware Wellness Reminder.md](Context-Aware%20Wellness%20Reminder.md), and the visual direction is documented in [DESIGN.md](DESIGN.md). The app stores its schedule, reminder rules, daily goals, and reminder history in `UserDefaults`. The previous local-notification and Live Activity implementation has been removed as the starting point for a new notification architecture.
 
 ## Development commands
 
@@ -55,11 +55,10 @@ Replace the simulator name/OS with a destination from `-showdestinations` when t
 
 ### Current implementation
 
-- `igotu/igotuApp.swift` is the `@main` SwiftUI entry point. It creates the configuration, history, reminder engine, notification scheduler, and Live Activity scheduler, then coordinates refreshes when setup or scene state changes.
+- `igotu/igotuApp.swift` is the `@main` SwiftUI entry point. It creates the configuration and history stores and injects them into the app views.
 - `igotu/Models/` contains the schedule, mode, behavior, frequency, rule, goal, and reminder-event models. `DailyMode` and `Behavior` own their stable keys, display metadata, and reminder-specific values.
 - `igotu/Services/DailyScheduleTimeline.swift` is the single source of truth for schedule intervals, including sleep and work intervals that cross midnight. `DailyModeManager` and `DailyModeProgressCalculator` consume it.
-- `igotu/Services/ReminderEngine.swift` calculates deterministic candidates from rules and history. `ReminderPlanner` expands that calculation across future schedule intervals and preserves valid pending notifications during ordinary refreshes.
-- `igotu/Services/ReminderCoordinator.swift` orchestrates refreshes. `NotificationScheduler` owns local notification requests and event status callbacks; `LiveActivityScheduler` owns the next-reminder Live Activity. `igotuLiveActivity/LiveActivityIntents.swift` records actions through the shared app-group store and removes the matching fallback notification.
+- `igotu/Services/ReminderEngine.swift` calculates deterministic reminder candidates from rules and history. It is retained as domain logic for the replacement notification architecture.
 - `igotu/Services/AppConfigurationStore.swift` persists configuration in `UserDefaults` and normalizes legacy or incomplete rules/goals on load. `ReminderHistoryStore` persists a bounded event history and applies cooldown, expiration, and completion rules.
 - `igotu/Assets.xcassets` contains the app icon and theme color catalogs. The Xcode project uses filesystem-synchronized groups, so Swift files added under app, extension, shared, or test directories are picked up automatically.
 
@@ -76,15 +75,10 @@ Keep platform effects behind their dedicated modules and keep schedule decisions
 ```text
 SwiftUI views
     -> configuration/history stores
-    -> reminder coordinator
-       -> schedule timeline and mode resolution
-       -> reminder planner and engine
-       -> notification scheduler
-       -> Live Activity scheduler
-           -> shared app-group action store
+    -> reminder engine and future notification architecture
 ```
 
-Keep `ReminderEngine` responsible for candidate calculation, `ReminderPlanner` responsible for schedule-aware expansion, and `ReminderCoordinator` responsible for orchestration. Inject `Calendar` and random-offset providers in tests; avoid recreating schedule math in views or platform adapters. When refreshing notifications, configuration changes use `replacePending: true`, while ordinary scene/action refreshes preserve valid pending requests.
+Keep schedule decisions in value-returning modules and keep platform effects behind dedicated adapters when the replacement notification architecture is added. Inject `Calendar` and random-offset providers in tests; avoid recreating schedule math in views or platform adapters.
 
 ### UI direction
 
