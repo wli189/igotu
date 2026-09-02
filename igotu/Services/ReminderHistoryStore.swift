@@ -21,6 +21,7 @@ final class ReminderHistoryStore: ObservableObject {
         now: Date = .now
     ) -> [ReminderEvent] {
         currentEvents(now: now).filter {
+            guard !$0.isTest else { return false }
             guard
                 $0.timestamp >= date,
                 $0.status.countsTowardCooldown,
@@ -47,12 +48,14 @@ final class ReminderHistoryStore: ObservableObject {
         behavior: Behavior,
         context: ReminderContext,
         dueAt: Date,
+        isTest: Bool = false,
         now: Date = .now
     ) -> ReminderEvent {
         let event = ReminderEvent(
             behavior: behavior,
             context: context,
             timestamp: dueAt,
+            isTest: isTest,
             status: .scheduled
         )
         append(event, now: now)
@@ -140,6 +143,33 @@ final class ReminderHistoryStore: ObservableObject {
         }
     }
 
+    func cancelTestEvents(
+        withIDs eventIDs: Set<UUID>,
+        at date: Date = .now
+    ) {
+        guard !eventIDs.isEmpty else { return }
+
+        var events = currentEvents(now: date)
+        var didChange = false
+
+        for index in events.indices {
+            guard eventIDs.contains(events[index].id),
+                  events[index].isTest,
+                  !events[index].status.isTerminal
+            else {
+                continue
+            }
+
+            events[index].status = .cancelled
+            events[index].resolvedAt = date
+            didChange = true
+        }
+
+        if didChange {
+            persist(events, now: date)
+        }
+    }
+
     func completedEvents(
         on day: Date = .now,
         calendar: Calendar = .current
@@ -150,6 +180,7 @@ final class ReminderHistoryStore: ObservableObject {
         }
 
         return currentEvents(now: day).filter {
+            guard !$0.isTest else { return false }
             guard $0.status.countsTowardCompletion else { return false }
             let completionDate = $0.resolvedAt ?? $0.timestamp
             return completionDate >= start && completionDate < end

@@ -48,7 +48,11 @@ struct ReminderPlanner {
             rollingBehaviors ?? Set(Behavior.allCases)
         } ?? Set(Behavior.allCases)
         let pendingEvents = events
-            .filter { $0.status == .scheduled && $0.timestamp >= now }
+            .filter {
+                !$0.isTest
+                    && $0.status == .scheduled
+                    && $0.timestamp >= now
+            }
             .sorted { first, second in
                 if first.timestamp != second.timestamp {
                     return first.timestamp < second.timestamp
@@ -95,6 +99,7 @@ struct ReminderPlanner {
 
         var planned = retainedReminders
         var planningEvents = events.filter { event in
+            guard !event.isTest else { return false }
             guard event.status.countsTowardCooldown else { return false }
             guard let anchor = event.cooldownAnchor(
                 expirationGracePeriod: ReminderTiming.expirationGracePeriod

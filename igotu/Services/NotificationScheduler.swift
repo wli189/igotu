@@ -14,8 +14,6 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
     private enum Category {
         static let behaviorReminder = "behavior-reminder"
         static let testReminder = "test-reminder"
-        static let acknowledge = "acknowledge-reminder"
-        static let skip = "skip-reminder"
     }
 
     private enum PayloadKey {
@@ -42,21 +40,9 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         self.onAction = onAction
         center.delegate = self
 
-        let actions = [
-            UNNotificationAction(
-                identifier: Category.acknowledge,
-                title: "Done",
-                options: []
-            ),
-            UNNotificationAction(
-                identifier: Category.skip,
-                title: "Skip",
-                options: []
-            )
-        ]
         let category = UNNotificationCategory(
             identifier: Category.behaviorReminder,
-            actions: actions,
+            actions: [],
             intentIdentifiers: [],
             options: [.customDismissAction]
         )
@@ -99,27 +85,23 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         )
     }
 
-    func scheduleTestNotification(
-        for behavior: Behavior,
-        after delay: TimeInterval = 60
-    ) async throws {
-        let fireDate = Date.now.addingTimeInterval(max(1, delay))
+    func scheduleTestNotification(for event: ReminderEvent) async throws {
         let content = UNMutableNotificationContent()
-        content.title = "Test: \(behavior.title)"
-        content.body = "Temporary test notification."
+        content.title = "Test: \(event.behavior.title)"
+        content.body = event.behavior.reminderMessage
         content.sound = .default
         content.categoryIdentifier = Category.testReminder
         content.threadIdentifier = Category.testReminder
-        content.userInfo = [
-            PayloadKey.kind: PayloadKey.test,
-            "version": 1,
+        var userInfo = ReminderNotificationPayload(eventID: event.id).userInfo
+        userInfo.merge([
             PayloadKey.testType: "behavior",
-            PayloadKey.testBehavior: behavior.rawValue,
-            PayloadKey.testFireDate: fireDate.timeIntervalSince1970
-        ]
+            PayloadKey.testBehavior: event.behavior.rawValue,
+            PayloadKey.testFireDate: event.timestamp.timeIntervalSince1970
+        ]) { _, newValue in newValue }
+        content.userInfo = userInfo
 
         let trigger = UNTimeIntervalNotificationTrigger(
-            timeInterval: max(1, fireDate.timeIntervalSinceNow),
+            timeInterval: max(1, event.timestamp.timeIntervalSinceNow),
             repeats: false
         )
         let request = UNNotificationRequest(
@@ -163,7 +145,7 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         await center.pendingNotificationRequests().compactMap { request in
             guard
                 request.identifier.hasPrefix(Identifier.testPrefix),
-                request.content.userInfo[PayloadKey.kind] as? String == PayloadKey.test,
+                request.content.userInfo[PayloadKey.testType] as? String != nil,
                 let fireDate = testFireDate(from: request.content.userInfo)
             else {
                 return nil
@@ -197,13 +179,18 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         }
     }
 
-    func removeTestNotifications() async {
+    func removeTestNotifications() async -> Set<UUID> {
         let requests = await center.pendingNotificationRequests().filter {
             $0.identifier.hasPrefix(Identifier.testPrefix)
         }
         let delivered = await center.deliveredNotifications().filter {
             $0.request.identifier.hasPrefix(Identifier.testPrefix)
         }
+        let eventIDs = Set(
+            (requests.map(\.content.userInfo)
+                + delivered.map { $0.request.content.userInfo })
+                .compactMap(ReminderNotificationPayload.eventID(from:))
+        )
 
         center.removePendingNotificationRequests(
             withIdentifiers: requests.map(\.identifier)
@@ -211,6 +198,8 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         center.removeDeliveredNotifications(
             withIdentifiers: delivered.map { $0.request.identifier }
         )
+
+        return eventIDs
     }
 
     func schedule(event: ReminderEvent) async throws {
@@ -355,7 +344,7 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         }
 
         onAction?(.delivered(eventID: eventID, at: .now))
-        completionHandler([.banner, .sound])
+        completionHandler([])
     }
 
     func userNotificationCenter(
@@ -373,30 +362,15 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
             return
         }
 
-        let action: ReminderAction?
-        switch response.actionIdentifier {
-        case Category.acknowledge:
-            action = .acknowledged(eventID: eventID, at: .now)
-        case Category.skip, UNNotificationDismissActionIdentifier:
-            action = .skipped(eventID: eventID, at: .now)
-        case UNNotificationDefaultActionIdentifier:
-            action = .delivered(eventID: eventID, at: .now)
-        default:
-            action = nil
+        guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else {
+            completionHandler()
+            return
         }
 
-        if let action {
-            switch action {
-            case .acknowledged, .skipped:
-                center.removeDeliveredNotifications(
-                    withIdentifiers: [response.notification.request.identifier]
-                )
-            case .delivered:
-                break
-            }
-            onAction?(action)
-        }
-
+        center.removeDeliveredNotifications(
+            withIdentifiers: [response.notification.request.identifier]
+        )
+        onAction?(.opened(eventID: eventID, at: .now))
         completionHandler()
     }
 

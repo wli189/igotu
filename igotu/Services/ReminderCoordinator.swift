@@ -3,6 +3,9 @@ import Combine
 
 @MainActor
 final class ReminderCoordinator: ObservableObject {
+    @Published private(set) var toastReminders: [ReminderEvent] = []
+    @Published private(set) var fullScreenReminder: ReminderEvent?
+
     private let configuration: AppConfigurationStore
     private let planner: ReminderPlanner
     private let history: ReminderHistoryStore
@@ -124,10 +127,23 @@ final class ReminderCoordinator: ObservableObject {
             return false
         }
 
+        let fireDate = Date.now.addingTimeInterval(60)
+        let mode = DailyModeManager().currentMode(
+            for: configuration.schedule,
+            at: fireDate
+        )
+        let event = history.recordScheduled(
+            behavior: behavior,
+            context: context(for: mode),
+            dueAt: fireDate,
+            isTest: true
+        )
+
         do {
-            try await notificationScheduler.scheduleTestNotification(for: behavior)
+            try await notificationScheduler.scheduleTestNotification(for: event)
             return true
         } catch {
+            history.cancelTestEvents(withIDs: [event.id])
             return false
         }
     }
@@ -147,7 +163,19 @@ final class ReminderCoordinator: ObservableObject {
     }
 
     func clearTestNotifications() async {
-        await notificationScheduler.removeTestNotifications()
+        let scheduledTestEventIDs = Set(
+            history.events.filter(\.isTest).map(\.id)
+        )
+        let notificationEventIDs = await notificationScheduler.removeTestNotifications()
+        let eventIDs = scheduledTestEventIDs.union(notificationEventIDs)
+        history.cancelTestEvents(withIDs: eventIDs)
+
+        toastReminders.removeAll { eventIDs.contains($0.id) }
+        if let fullScreenReminder,
+           eventIDs.contains(fullScreenReminder.id)
+        {
+            self.fullScreenReminder = nil
+        }
     }
 
     func pendingTestNotifications() async -> [ScheduledTestNotification] {
@@ -165,18 +193,29 @@ final class ReminderCoordinator: ObservableObject {
             before: now,
             gracePeriod: ReminderTiming.expirationGracePeriod
         )
+        let realExpiredEvents = expiredEvents.filter { !$0.isTest }
 
         var rollingFrom = request.rollingFrom
         var rollingBehaviors = request.rollingBehaviors
         var compensationCandidates = request.compensationCandidates
 
         if !expiredEvents.isEmpty {
+            let expiredEventIDs = Set(expiredEvents.map(\.id))
+            toastReminders.removeAll { expiredEventIDs.contains($0.id) }
+            if let fullScreenReminder,
+               expiredEventIDs.contains(fullScreenReminder.id)
+            {
+                self.fullScreenReminder = nil
+            }
+        }
+
+        if !realExpiredEvents.isEmpty {
             let compensationDate = now.addingTimeInterval(
                 ReminderTiming.compensationDelay
             )
             rollingFrom = max(rollingFrom ?? compensationDate, compensationDate)
 
-            let expiredBehaviors = Set(expiredEvents.map(\.behavior))
+            let expiredBehaviors = Set(realExpiredEvents.map(\.behavior))
             if request.rollingFrom == nil {
                 rollingBehaviors = expiredBehaviors
             } else if let currentRollingBehaviors = rollingBehaviors {
@@ -185,7 +224,7 @@ final class ReminderCoordinator: ObservableObject {
                 rollingBehaviors = mergedBehaviors
             }
 
-            compensationCandidates += expiredEvents.compactMap { event in
+            compensationCandidates += realExpiredEvents.compactMap { event in
                 compensationCandidate(
                     for: event,
                     dueAt: compensationDate
@@ -267,9 +306,23 @@ final class ReminderCoordinator: ObservableObject {
             guard history.updateStatus(for: eventID, to: .delivered, at: date) else {
                 return
             }
+            enqueueToast(for: eventID)
             Task { [weak self] in
                 await self?.refresh()
             }
+        case let .opened(eventID, date):
+            guard let event = history.event(for: eventID),
+                  !event.status.isTerminal
+            else {
+                return
+            }
+
+            if event.status == .scheduled {
+                _ = history.updateStatus(for: eventID, to: .delivered, at: date)
+            }
+
+            toastReminders.removeAll { $0.id == eventID }
+            fullScreenReminder = history.event(for: eventID)
         case let .acknowledged(eventID, date):
             guard let event = history.event(for: eventID),
                   history.updateStatus(
@@ -280,6 +333,8 @@ final class ReminderCoordinator: ObservableObject {
             else {
                 return
             }
+            removePrompt(for: eventID)
+            guard !event.isTest else { return }
             Task { [weak self] in
                 await self?.refresh(
                     rollingFrom: date,
@@ -296,6 +351,8 @@ final class ReminderCoordinator: ObservableObject {
             else {
                 return
             }
+            removePrompt(for: eventID)
+            guard !event.isTest else { return }
             let compensationDate = date.addingTimeInterval(
                 ReminderTiming.compensationDelay
             )
@@ -313,6 +370,37 @@ final class ReminderCoordinator: ObservableObject {
                     compensationCandidates: [compensation]
                 )
             }
+        }
+    }
+
+    func acknowledge(eventID: UUID) {
+        handle(.acknowledged(eventID: eventID, at: .now))
+    }
+
+    func skip(eventID: UUID) {
+        handle(.skipped(eventID: eventID, at: .now))
+    }
+
+    func dismissFullScreenReminder() {
+        fullScreenReminder = nil
+    }
+
+    private func enqueueToast(for eventID: UUID) {
+        guard let event = history.event(for: eventID),
+              !event.status.isTerminal,
+              fullScreenReminder?.id != eventID,
+              !toastReminders.contains(where: { $0.id == eventID })
+        else {
+            return
+        }
+
+        toastReminders.append(event)
+    }
+
+    private func removePrompt(for eventID: UUID) {
+        toastReminders.removeAll { $0.id == eventID }
+        if fullScreenReminder?.id == eventID {
+            fullScreenReminder = nil
         }
     }
 

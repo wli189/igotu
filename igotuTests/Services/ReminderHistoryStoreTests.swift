@@ -64,6 +64,27 @@ struct ReminderHistoryStoreTests {
         #expect(store.recentEvents(since: now.addingTimeInterval(-60), now: now).isEmpty)
     }
 
+    @Test func testEventsDoNotAffectHistoryMetrics() {
+        let suiteName = "ReminderHistoryTestEventTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = ReminderHistoryStore(defaults: defaults)
+        let now = Date()
+        let event = store.recordScheduled(
+            behavior: .hydration,
+            context: .work,
+            dueAt: now,
+            isTest: true,
+            now: now
+        )
+
+        store.updateStatus(for: event.id, to: .acknowledged, at: now)
+
+        #expect(store.recentEvents(since: now.addingTimeInterval(-60), now: now).isEmpty)
+        #expect(store.completedEvents(on: now).isEmpty)
+    }
+
     @Test func reminderCompletedBeforeItsDueTimeStillAffectsCooldown() {
         let suiteName = "ReminderHistoryEarlyCompletionTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

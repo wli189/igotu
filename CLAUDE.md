@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-`igotu` is an iOS SwiftUI app prototype for context-aware wellness reminders. The product concept is documented in [Context-Aware Wellness Reminder.md](Context-Aware%20Wellness%20Reminder.md), and the visual direction is documented in [DESIGN.md](DESIGN.md). The app stores its schedule, reminder rules, daily goals, and reminder history in `UserDefaults`. The current notification architecture schedules multiple event-specific local notifications within a rolling window; a future interactive reminder surface is intentionally deferred.
+`igotu` is an iOS SwiftUI app prototype for context-aware wellness reminders. The product concept is documented in [Context-Aware Wellness Reminder.md](Context-Aware%20Wellness%20Reminder.md), and the visual direction is documented in [DESIGN.md](DESIGN.md). The app stores its schedule, reminder rules, daily goals, and reminder history in `UserDefaults`. The current notification architecture schedules multiple event-specific local notifications within a rolling window. Foreground delivery uses an in-app confirmation prompt; opening a background notification presents a full-screen confirmation view. A separate future interactive surface is intentionally deferred.
 
 ## Development commands
 
@@ -62,6 +62,8 @@ Replace the simulator name/OS with a destination from `-showdestinations` when t
 - `igotu/Services/ReminderPlanner.swift` builds a bounded rolling plan of multiple reminders per enabled behavior and can replan only selected behaviors.
 - `igotu/Services/ReminderCoordinator.swift` reconciles reminder events with local notification requests and routes notification actions back through the event lifecycle.
 - `igotu/Services/NotificationScheduler.swift` is the local notification adapter. `ReminderBackgroundScheduler` requests periodic refresh opportunities to replenish the rolling plan.
+- Behavior options in `NotificationTestView` create test events that reuse the production notification payload and confirmation flow; test events are excluded from planning and daily metrics. Wind Down testing remains a standalone notification.
+- `igotu/Views/ReminderToastView.swift` renders foreground reminder actions, while `ReminderConfirmationView.swift` renders the full-screen confirmation route opened from a notification.
 - `igotu/Services/AppConfigurationStore.swift` persists configuration in `UserDefaults` and normalizes legacy or incomplete rules/goals on load. `ReminderHistoryStore` persists a bounded event history and applies cooldown, expiration, and completion rules.
 - `igotu/Assets.xcassets` contains the app icon and theme color catalogs. The Xcode project uses filesystem-synchronized groups, so Swift files added under app, extension, shared, or test directories are picked up automatically.
 

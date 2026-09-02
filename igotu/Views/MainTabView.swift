@@ -8,6 +8,7 @@ import Combine
 
 struct MainTabView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore
+    @EnvironmentObject private var reminderCoordinator: ReminderCoordinator
 
     private enum Tab: Hashable {
         case today
@@ -53,6 +54,38 @@ struct MainTabView: View {
         .onChange(of: configuration.schedule) { _, _ in
             refreshTheme()
         }
+        .overlay(alignment: .top) {
+            if let event = reminderCoordinator.toastReminders.first {
+                ReminderToastView(
+                    event: event,
+                    onAcknowledge: {
+                        reminderCoordinator.acknowledge(eventID: event.id)
+                    },
+                    onSkip: {
+                        reminderCoordinator.skip(eventID: event.id)
+                    }
+                )
+                .safeAreaPadding(.top, 8)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { reminderCoordinator.fullScreenReminder != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        reminderCoordinator.dismissFullScreenReminder()
+                    }
+                }
+            )
+        ) {
+            if let event = reminderCoordinator.fullScreenReminder {
+                ReminderConfirmationView(event: event)
+                    .environmentObject(reminderCoordinator)
+            } else {
+                Color.clear
+            }
+        }
     }
 
     private func refreshTheme() {
@@ -67,4 +100,10 @@ struct MainTabView: View {
     MainTabView()
         .environmentObject(AppConfigurationStore())
         .environmentObject(ReminderHistoryStore())
+        .environmentObject(ReminderCoordinator(
+            configuration: AppConfigurationStore(),
+            engine: ReminderEngine(offsetProvider: { _ in 0 }),
+            history: ReminderHistoryStore(),
+            notificationScheduler: NotificationScheduler()
+        ))
 }

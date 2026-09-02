@@ -35,6 +35,7 @@ struct ReminderEvent: Identifiable, Codable, Equatable {
     let id: UUID
     let behavior: Behavior
     let context: ReminderContext
+    let isTest: Bool
     var timestamp: Date
     var status: ReminderEventStatus
     var resolvedAt: Date?
@@ -44,15 +45,32 @@ struct ReminderEvent: Identifiable, Codable, Equatable {
         behavior: Behavior,
         context: ReminderContext,
         timestamp: Date,
+        isTest: Bool = false,
         status: ReminderEventStatus = .delivered,
         resolvedAt: Date? = nil
     ) {
         self.id = id
         self.behavior = behavior
         self.context = context
+        self.isTest = isTest
         self.timestamp = timestamp
         self.status = status
         self.resolvedAt = resolvedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, behavior, context, isTest, timestamp, status, resolvedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        behavior = try container.decode(Behavior.self, forKey: .behavior)
+        context = try container.decode(ReminderContext.self, forKey: .context)
+        isTest = try container.decodeIfPresent(Bool.self, forKey: .isTest) ?? false
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        status = try container.decode(ReminderEventStatus.self, forKey: .status)
+        resolvedAt = try container.decodeIfPresent(Date.self, forKey: .resolvedAt)
     }
 
     func cooldownAnchor(expirationGracePeriod: TimeInterval) -> Date? {

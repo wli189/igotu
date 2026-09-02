@@ -94,7 +94,7 @@ Using standard Apple System Fonts (**SF Pro / SF Pro Rounded** for numerals and 
 - **Haptic Feedback**:
   - `UIImpactFeedbackGenerator(style: .soft)` on completing or acknowledging a reminder.
   - `UISelectionFeedbackGenerator()` when switching context cards or toggling behaviors.
-- **Dismiss / Action Gestures**: Swipe down or tap to smoothly mark behavior done without popping up modal alerts.
+- **Reminder Actions**: Foreground reminders use a compact in-app confirmation prompt. Tapping a background notification opens a full-screen confirmation view; Done and Skip resolve the matching reminder event.
 
 ---
 

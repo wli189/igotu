@@ -13,12 +13,12 @@ struct DailyMetricsCalculator {
         calendar: Calendar = .current
     ) -> DailyMetrics {
         let hydrationCount = events.filter {
-            $0.behavior == .hydration
+            !$0.isTest && $0.behavior == .hydration
         }.count
 
         let standingHours = Set(
             events.compactMap { event -> Int? in
-                guard event.behavior == .standUp else { return nil }
+                guard !event.isTest, event.behavior == .standUp else { return nil }
                 return calendar.component(
                     .hour,
                     from: event.resolvedAt ?? event.timestamp

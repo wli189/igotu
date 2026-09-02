@@ -287,8 +287,12 @@ Daily wellness behaviors use multiple event-specific local notifications. The ap
 - Done confirms the matching event and records it in reminder history.
 - Skip dismisses the matching event without counting it toward a daily goal.
 - Background refresh replenishes the future window; it is not required for an already scheduled notification to fire.
+- When the app is in the foreground, a delivered reminder becomes an in-app confirmation prompt instead of a system banner.
+- When the app is in the background or not running, tapping the notification opens a full-screen confirmation view for that event.
+- The system notification only opens the app; Done and Skip are handled in the app.
+- The Testing page's behavior buttons create test events that use this same delivery and confirmation flow, while remaining excluded from normal reminder planning and daily metrics. Wind Down testing remains independent.
 
-An eventual interactive reminder surface may be added later. It will bind to the same event identifier and lifecycle rather than becoming a second scheduling system.
+The confirmation prompt and full-screen view bind to the same event identifier and lifecycle rather than becoming a second scheduling system.
 
 ---
 
@@ -535,7 +539,7 @@ Notifications should be scheduled ahead within a bounded rolling window rather t
 |---|---|---|
 | Drink Water, Stand Up, Movement | Local notification | Multiple event-specific pending reminders per enabled behavior within the rolling planning window |
 | Sleep / Wind Down | Local notification | Separate from daily behavior reminders |
-| Future interactive reminder surface | To be designed | Must bind to an existing reminder event rather than create its own lifecycle |
+| Future interactive reminder surface | To be designed | May replace the in-app prompt later, but must bind to an existing reminder event |
 
 The system should consider:
 
@@ -549,7 +553,7 @@ The system should consider:
 
 Multiple reminders for different behaviors, and multiple future reminders for the same behavior, may be pending at the same time. The current planner uses a 12-hour rolling window and a total cap of 60 behavior notifications. It retains valid scheduled events and avoids duplicate events for the same planned time. Each notification must use an event-specific identifier so that resolving one reminder cannot cancel or modify another.
 
-When the user taps Done or Skip, the app updates the matching event and replans only that behavior, preserving future events for other behaviors. Foreground refresh, background refresh, mode changes, sleep transitions, and settings changes run the same reconciliation process. Only stale or ineligible events should be cancelled.
+When the user taps Done or Skip in the app, the app updates the matching event and replans only that behavior, preserving future events for other behaviors. Opening a notification does not resolve the event. Foreground refresh, background refresh, mode changes, sleep transitions, and settings changes run the same reconciliation process. Only stale or ineligible events should be cancelled.
 
 The goal is:
 
@@ -570,7 +574,7 @@ scheduled ──> delivered ──> acknowledged
      └─────────────────────> cancelled
 ```
 
-Terminal states are `acknowledged`, `skipped`, `expired`, and `cancelled`. Acknowledged events count toward daily goals; skipped, expired, and cancelled events do not. State updates must be idempotent so that repeated taps, notification dismissal, or a delayed background callback cannot change an already resolved event. `resolvedAt` is set only for terminal states.
+Terminal states are `acknowledged`, `skipped`, `expired`, and `cancelled`. Acknowledged events count toward daily goals; skipped, expired, and cancelled events do not. Opening a notification only marks an event as `delivered`; the confirmation action resolves it. State updates must be idempotent so that repeated taps or a delayed background callback cannot change an already resolved event. `resolvedAt` is set only for terminal states.
 
 The next-reminder cooldown uses a state-specific anchor: `scheduled` and `delivered` use the planned due time, `acknowledged` and `skipped` use the actual action time, `expired` uses the planned due time plus the grace period, and `cancelled` does not affect future reminders. This means completing or skipping a reminder starts the next interval from the user's action, while an expired reminder starts it from the end of its grace period.
 
@@ -581,9 +585,9 @@ The next-reminder cooldown uses a state-specific anchor: `scheduled` and `delive
 1. Make the reminder planner produce multiple candidates per enabled behavior within a bounded rolling window.
 2. Add a central Reminder Coordinator that reconciles the desired plan with pending local notifications and reminder history.
 3. Give every local notification an event-specific identifier and keep the sleep reminder in its own category.
-4. Route Done, Skip, dismissal, expiration, mode changes, and settings changes through the same event lifecycle.
+4. Route notification delivery, notification opening, Done, Skip, expiration, mode changes, and settings changes through the same event lifecycle.
 5. Replan only the affected behavior after a user action; preserve other behaviors' future events.
-6. Test independent pending reminders, event-specific actions, duplicate actions, background handling, mode changes, and rolling replenishment.
+6. Test independent pending reminders, foreground prompts, full-screen notification opening, duplicate actions, background handling, mode changes, and rolling replenishment.
 
 ---
 
