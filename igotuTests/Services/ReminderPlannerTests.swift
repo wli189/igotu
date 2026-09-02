@@ -5,7 +5,8 @@ import Testing
 struct ReminderPlannerTests {
     private let planner = ReminderPlanner(
         engine: ReminderEngine(offsetProvider: { _ in 0 }),
-        timeline: DailyScheduleTimeline(calendar: Self.calendar)
+        timeline: DailyScheduleTimeline(calendar: Self.calendar),
+        planningHorizon: 2 * 60 * 60
     )
     private let now = Self.date(year: 2026, month: 8, day: 27, hour: 17, minute: 50)
 
@@ -147,8 +148,150 @@ struct ReminderPlannerTests {
         )])
     }
 
+    @Test func plansMultipleRemindersWithinThePlanningHorizon() {
+        let plan = planner.plan(
+            for: Self.schedule,
+            workRules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .frequent)
+            ],
+            idleRules: [],
+            events: [],
+            now: Self.date(year: 2026, month: 8, day: 27, hour: 10)
+        )
+
+        #expect(plan.reminders.map(\.candidate.dueAt) == [
+            Self.date(year: 2026, month: 8, day: 27, hour: 10, minute: 30),
+            Self.date(year: 2026, month: 8, day: 27, hour: 11),
+            Self.date(year: 2026, month: 8, day: 27, hour: 11, minute: 30)
+        ])
+    }
+
+    @Test func keepsExistingEventsAndPlansTheRemainingWindow() {
+        let existingEvent = ReminderEvent(
+            behavior: .hydration,
+            context: .work,
+            timestamp: Self.date(year: 2026, month: 8, day: 27, hour: 10, minute: 30),
+            status: .scheduled
+        )
+
+        let plan = planner.plan(
+            for: Self.schedule,
+            workRules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .frequent)
+            ],
+            idleRules: [],
+            events: [existingEvent],
+            now: Self.date(year: 2026, month: 8, day: 27, hour: 10)
+        )
+
+        #expect(plan.eventIDsToCancel.isEmpty)
+        #expect(plan.reminders.map(\.candidate.dueAt) == [
+            existingEvent.timestamp,
+            Self.date(year: 2026, month: 8, day: 27, hour: 11),
+            Self.date(year: 2026, month: 8, day: 27, hour: 11, minute: 30)
+        ])
+        #expect(plan.reminders.first?.eventID == existingEvent.id)
+    }
+
+    @Test func rollingPlanStartsFromCompletionTimeAndCancelsFutureEvents() {
+        let oldFutureEvent = ReminderEvent(
+            behavior: .hydration,
+            context: .work,
+            timestamp: Self.date(year: 2026, month: 8, day: 27, hour: 10, minute: 28),
+            status: .scheduled
+        )
+        let completionTime = Self.date(year: 2026, month: 8, day: 27, hour: 10, minute: 5)
+        let completedEvent = ReminderEvent(
+            behavior: .hydration,
+            context: .work,
+            timestamp: Self.date(year: 2026, month: 8, day: 27, hour: 10),
+            status: .acknowledged,
+            resolvedAt: completionTime
+        )
+
+        let plan = planner.plan(
+            for: Self.schedule,
+            workRules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .frequent)
+            ],
+            idleRules: [],
+            events: [completedEvent, oldFutureEvent],
+            now: completionTime,
+            rollingFrom: completionTime
+        )
+
+        #expect(plan.eventIDsToCancel == [oldFutureEvent.id])
+        #expect(plan.reminders.map(\.candidate.dueAt) == [
+            Self.date(year: 2026, month: 8, day: 27, hour: 10, minute: 35),
+            Self.date(year: 2026, month: 8, day: 27, hour: 11, minute: 5),
+            Self.date(year: 2026, month: 8, day: 27, hour: 11, minute: 35)
+        ])
+        #expect(plan.reminders.allSatisfy { $0.eventID == nil })
+    }
+
+    @Test func compensationBecomesTheFirstReminderOfTheNewWindow() {
+        let skipTime = Self.date(year: 2026, month: 8, day: 27, hour: 10, minute: 5)
+        let compensationTime = skipTime.addingTimeInterval(9 * 60)
+        let skippedEvent = ReminderEvent(
+            behavior: .hydration,
+            context: .work,
+            timestamp: Self.date(year: 2026, month: 8, day: 27, hour: 10),
+            status: .skipped,
+            resolvedAt: skipTime
+        )
+
+        let plan = planner.plan(
+            for: Self.schedule,
+            workRules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .frequent)
+            ],
+            idleRules: [],
+            events: [skippedEvent],
+            now: skipTime,
+            rollingFrom: compensationTime,
+            compensationCandidates: [ReminderCandidate(
+                behavior: .hydration,
+                mode: .work,
+                dueAt: compensationTime
+            )]
+        )
+
+        #expect(plan.reminders.map(\.candidate.dueAt) == [
+            compensationTime,
+            compensationTime.addingTimeInterval(30 * 60),
+            compensationTime.addingTimeInterval(60 * 60),
+            compensationTime.addingTimeInterval(90 * 60)
+        ])
+    }
+
+    @Test func capsThePlannedReminderCount() {
+        let cappedPlanner = ReminderPlanner(
+            engine: ReminderEngine(offsetProvider: { _ in 0 }),
+            timeline: DailyScheduleTimeline(calendar: Self.calendar),
+            planningHorizon: 12 * 60 * 60,
+            maximumReminderCount: 2
+        )
+
+        let plan = cappedPlanner.plan(
+            for: Self.schedule,
+            workRules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .frequent)
+            ],
+            idleRules: [],
+            events: [],
+            now: Self.date(year: 2026, month: 8, day: 27, hour: 10)
+        )
+
+        #expect(plan.reminders.count == 2)
+    }
+
     @Test func sleepBoundaryCancelsAwakeReminderAndPlansAfterWakeUp() {
         let sleepNow = Self.date(year: 2026, month: 8, day: 27, hour: 22)
+        let longHorizonPlanner = ReminderPlanner(
+            engine: ReminderEngine(offsetProvider: { _ in 0 }),
+            timeline: DailyScheduleTimeline(calendar: Self.calendar),
+            planningHorizon: 12 * 60 * 60
+        )
         let event = ReminderEvent(
             behavior: .movement,
             context: .idle,
@@ -156,7 +299,7 @@ struct ReminderPlannerTests {
             status: .scheduled
         )
 
-        let plan = planner.plan(
+        let plan = longHorizonPlanner.plan(
             for: Self.schedule,
             workRules: [],
             idleRules: [

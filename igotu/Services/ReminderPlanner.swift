@@ -15,15 +15,21 @@ struct ReminderPlanner {
     private let engine: ReminderEngine
     private let timeline: DailyScheduleTimeline
     private let intervalLimit: Int
+    private let planningHorizon: TimeInterval
+    private let maximumReminderCount: Int
 
     init(
         engine: ReminderEngine,
         timeline: DailyScheduleTimeline = DailyScheduleTimeline(),
-        intervalLimit: Int = 32
+        intervalLimit: Int = 32,
+        planningHorizon: TimeInterval = ReminderTiming.notificationPlanningHorizon,
+        maximumReminderCount: Int = ReminderTiming.maximumPendingBehaviorNotifications
     ) {
         self.engine = engine
         self.timeline = timeline
         self.intervalLimit = intervalLimit
+        self.planningHorizon = max(0, planningHorizon)
+        self.maximumReminderCount = max(0, maximumReminderCount)
     }
 
     func plan(
@@ -31,8 +37,12 @@ struct ReminderPlanner {
         workRules: [ReminderRule],
         idleRules: [ReminderRule],
         events: [ReminderEvent],
-        now: Date = .now
+        now: Date = .now,
+        rollingFrom: Date? = nil,
+        compensationCandidates: [ReminderCandidate] = []
     ) -> ReminderPlan {
+        let planningStart = rollingFrom ?? now
+        let horizonEnd = planningStart.addingTimeInterval(planningHorizon)
         let pendingEvents = events
             .filter { $0.status == .scheduled && $0.timestamp >= now }
             .sorted { first, second in
@@ -43,47 +53,109 @@ struct ReminderPlanner {
                 return first.id.uuidString < second.id.uuidString
             }
 
-        var retainedByBehavior: [Behavior: PlannedReminder] = [:]
+        var retainedReminders: [PlannedReminder] = []
         var eventIDsToCancel = Set<UUID>()
 
-        for event in pendingEvents {
-            guard let candidate = validCandidate(
-                for: event,
-                schedule: schedule,
-                workRules: workRules,
-                idleRules: idleRules,
-                now: now
-            ) else {
-                eventIDsToCancel.insert(event.id)
-                continue
-            }
+        if rollingFrom != nil {
+            eventIDsToCancel = Set(
+                events
+                    .filter { $0.status == .scheduled && $0.timestamp >= now }
+                    .map(\.id)
+            )
+        } else {
+            for event in pendingEvents {
+                guard event.timestamp < horizonEnd else {
+                    eventIDsToCancel.insert(event.id)
+                    continue
+                }
 
-            if retainedByBehavior[event.behavior] == nil {
-                retainedByBehavior[event.behavior] = PlannedReminder(
+                guard let candidate = validCandidate(
+                    for: event,
+                    schedule: schedule,
+                    workRules: workRules,
+                    idleRules: idleRules,
+                    now: now
+                ) else {
+                    eventIDsToCancel.insert(event.id)
+                    continue
+                }
+
+                retainedReminders.append(PlannedReminder(
                     eventID: event.id,
                     candidate: candidate
-                )
-            } else {
-                eventIDsToCancel.insert(event.id)
+                ))
             }
         }
 
-        let recentEvents = events.filter { event in
+        var planned = retainedReminders
+        var planningEvents = events.filter { event in
             guard event.status.countsTowardCooldown else { return false }
-
             guard let anchor = event.cooldownAnchor(
                 expirationGracePeriod: ReminderTiming.expirationGracePeriod
             ) else {
                 return false
             }
 
-            return anchor <= now
+            guard anchor <= planningStart else { return false }
+
+            if rollingFrom != nil,
+               event.status == .scheduled,
+               event.timestamp >= now
+            {
+                return false
+            }
+
+            return true
         }
 
-        var planned = retainedByBehavior
+        for retainedReminder in retainedReminders {
+            guard let eventID = retainedReminder.eventID else { continue }
+
+            planningEvents.append(ReminderEvent(
+                id: eventID,
+                behavior: retainedReminder.candidate.behavior,
+                context: context(for: retainedReminder.candidate.mode),
+                timestamp: retainedReminder.candidate.dueAt,
+                status: .scheduled
+            ))
+        }
+
+        let validCompensations = compensationCandidates.filter { candidate in
+            candidate.dueAt >= planningStart
+                && candidate.dueAt < horizonEnd
+                && rule(
+                    for: candidate.behavior,
+                    in: candidate.mode,
+                    workRules: workRules,
+                    idleRules: idleRules
+                )?.isEnabled == true
+                && timeline.currentInterval(for: schedule, at: candidate.dueAt).mode
+                    == candidate.mode
+        }
+
+        for compensation in validCompensations {
+            let alreadyPlanned = planned.contains {
+                $0.candidate.behavior == compensation.behavior
+                    && $0.candidate.dueAt == compensation.dueAt
+            }
+
+            guard !alreadyPlanned else { continue }
+
+            planned.append(PlannedReminder(
+                eventID: nil,
+                candidate: compensation
+            ))
+            planningEvents.append(ReminderEvent(
+                behavior: compensation.behavior,
+                context: context(for: compensation.mode),
+                timestamp: compensation.dueAt,
+                status: .scheduled
+            ))
+        }
+
         for interval in timeline.intervals(
             for: schedule,
-            startingAt: now,
+            startingAt: planningStart,
             count: intervalLimit
         ) {
             let rules: [ReminderRule]
@@ -97,25 +169,79 @@ struct ReminderPlanner {
                 rules = idleRules
             }
 
-            let planningNow = max(now, interval.start)
-            let candidates = engine.nextReminders(from: ReminderEngineInput(
-                now: planningNow,
-                mode: interval.mode,
-                rules: rules,
-                recentEvents: recentEvents,
-                activeInterval: interval
-            ))
+            let intervalEnd = min(interval.end, horizonEnd)
+            guard interval.start < horizonEnd, interval.start < intervalEnd else {
+                continue
+            }
 
-            for candidate in candidates where planned[candidate.behavior] == nil {
-                planned[candidate.behavior] = PlannedReminder(
-                    eventID: nil,
-                    candidate: candidate
-                )
+            for rule in rules where rule.isEnabled {
+                var planningNow = max(planningStart, interval.start)
+
+                while planningNow < intervalEnd {
+                    let existingDueAt = planned.filter { reminder in
+                        reminder.candidate.behavior == rule.behavior
+                            && reminder.candidate.mode == interval.mode
+                            && reminder.candidate.dueAt >= planningNow
+                            && reminder.candidate.dueAt < intervalEnd
+                    }
+                    .map(\.candidate.dueAt)
+                    .min()
+
+                    if let existingDueAt {
+                        planningNow = existingDueAt
+                    }
+
+                    guard let candidate = engine.nextReminder(from: ReminderEngineInput(
+                        now: planningNow,
+                        mode: interval.mode,
+                        rules: [rule],
+                        recentEvents: planningEvents,
+                        activeInterval: interval
+                    )) else {
+                        break
+                    }
+
+                    guard candidate.dueAt < intervalEnd,
+                          candidate.dueAt < horizonEnd else {
+                        break
+                    }
+
+                    let alreadyPlanned = planned.contains {
+                        $0.candidate.behavior == candidate.behavior
+                            && $0.candidate.mode == candidate.mode
+                            && $0.candidate.dueAt == candidate.dueAt
+                    }
+
+                    if !alreadyPlanned {
+                        planned.append(PlannedReminder(
+                            eventID: nil,
+                            candidate: candidate
+                        ))
+                        planningEvents.append(ReminderEvent(
+                            behavior: candidate.behavior,
+                            context: context(for: candidate.mode),
+                            timestamp: candidate.dueAt,
+                            status: .scheduled
+                        ))
+                    }
+
+                    guard candidate.dueAt > planningNow else { break }
+                    planningNow = candidate.dueAt
+                }
+            }
+        }
+
+        let sortedReminders = planned.sorted(by: sortReminders)
+        let limitedReminders = Array(sortedReminders.prefix(maximumReminderCount))
+
+        for reminder in sortedReminders.dropFirst(maximumReminderCount) {
+            if let eventID = reminder.eventID {
+                eventIDsToCancel.insert(eventID)
             }
         }
 
         return ReminderPlan(
-            reminders: planned.values.sorted(by: sortReminders),
+            reminders: limitedReminders,
             eventIDsToCancel: eventIDsToCancel
         )
     }
@@ -174,6 +300,13 @@ struct ReminderPlanner {
             return .work
         case .idle:
             return .idle
+        }
+    }
+
+    private func context(for mode: DailyMode) -> ReminderContext {
+        switch mode {
+        case .work: return .work
+        case .idle, .sleeping: return .idle
         }
     }
 

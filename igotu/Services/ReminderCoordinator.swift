@@ -9,7 +9,37 @@ final class ReminderCoordinator: ObservableObject {
     private let notificationScheduler: NotificationScheduler
 
     private var refreshInProgress = false
-    private var refreshQueued = false
+    private var queuedRefreshRequest: RefreshRequest?
+
+    private struct RefreshRequest {
+        let rollingFrom: Date?
+        let compensationCandidates: [ReminderCandidate]
+
+        static let normal = RefreshRequest(
+            rollingFrom: nil,
+            compensationCandidates: []
+        )
+
+        func merged(with other: RefreshRequest) -> RefreshRequest {
+            let rollingFrom: Date?
+            switch (self.rollingFrom, other.rollingFrom) {
+            case let (first?, second?):
+                rollingFrom = max(first, second)
+            case let (first?, nil):
+                rollingFrom = first
+            case let (nil, second?):
+                rollingFrom = second
+            case (nil, nil):
+                rollingFrom = nil
+            }
+
+            return RefreshRequest(
+                rollingFrom: rollingFrom,
+                compensationCandidates: compensationCandidates
+                    + other.compensationCandidates
+            )
+        }
+    }
 
     init(
         configuration: AppConfigurationStore,
@@ -28,18 +58,41 @@ final class ReminderCoordinator: ObservableObject {
     }
 
     func refresh() async {
+        await refresh(with: .normal)
+    }
+
+    func refreshRollingFromNow() async {
+        await refresh(rollingFrom: .now)
+    }
+
+    private func refresh(with request: RefreshRequest) async {
         if refreshInProgress {
-            refreshQueued = true
+            queuedRefreshRequest = (queuedRefreshRequest ?? .normal)
+                .merged(with: request)
             return
         }
 
         refreshInProgress = true
         defer { refreshInProgress = false }
 
-        repeat {
-            refreshQueued = false
-            await performRefresh()
-        } while refreshQueued
+        var currentRequest = request
+        while true {
+            await performRefresh(with: currentRequest)
+
+            guard let queuedRefreshRequest else { break }
+            self.queuedRefreshRequest = nil
+            currentRequest = queuedRefreshRequest
+        }
+    }
+
+    private func refresh(
+        rollingFrom date: Date,
+        compensationCandidates: [ReminderCandidate] = []
+    ) async {
+        await refresh(with: RefreshRequest(
+            rollingFrom: date,
+            compensationCandidates: compensationCandidates
+        ))
     }
 
     @discardableResult
@@ -78,24 +131,47 @@ final class ReminderCoordinator: ObservableObject {
         await notificationScheduler.pendingTestNotifications()
     }
 
-    private func performRefresh() async {
+    private func performRefresh(with request: RefreshRequest) async {
         guard configuration.hasCompletedSetup else { return }
 
         await notificationScheduler.removeLegacyBehaviorReminders()
         _ = await notificationScheduler.requestPermissionIfNeeded()
 
         let now = Date.now
-        history.expireScheduledEvents(
+        let expiredEvents = history.expireScheduledEvents(
             before: now,
             gracePeriod: ReminderTiming.expirationGracePeriod
         )
+
+        var rollingFrom = request.rollingFrom
+        var compensationCandidates = request.compensationCandidates
+
+        if !expiredEvents.isEmpty {
+            let compensationDate = now.addingTimeInterval(
+                ReminderTiming.compensationDelay
+            )
+            rollingFrom = max(rollingFrom ?? compensationDate, compensationDate)
+
+            compensationCandidates += expiredEvents.compactMap { event in
+                compensationCandidate(
+                    for: event,
+                    dueAt: compensationDate
+                )
+            }
+        }
+
+        if let earliestCompensation = compensationCandidates.map(\.dueAt).min() {
+            rollingFrom = max(rollingFrom ?? earliestCompensation, earliestCompensation)
+        }
 
         let plan = planner.plan(
             for: configuration.schedule,
             workRules: configuration.workReminders,
             idleRules: configuration.idleReminders,
             events: history.events,
-            now: now
+            now: now,
+            rollingFrom: rollingFrom,
+            compensationCandidates: compensationCandidates
         )
 
         for eventID in plan.eventIDsToCancel {
@@ -155,15 +231,49 @@ final class ReminderCoordinator: ObservableObject {
         switch action {
         case let .delivered(eventID, date):
             history.updateStatus(for: eventID, to: .delivered, at: date)
+            Task { [weak self] in
+                await self?.refresh()
+            }
         case let .acknowledged(eventID, date):
             history.updateStatus(for: eventID, to: .acknowledged, at: date)
+            Task { [weak self] in
+                await self?.refresh(rollingFrom: date)
+            }
         case let .skipped(eventID, date):
             history.updateStatus(for: eventID, to: .skipped, at: date)
+            let compensationDate = date.addingTimeInterval(
+                ReminderTiming.compensationDelay
+            )
+            let compensation = history.event(for: eventID).flatMap { event in
+                compensationCandidate(for: event, dueAt: compensationDate)
+            }
+
+            Task { [weak self] in
+                await self?.refresh(
+                    rollingFrom: compensationDate,
+                    compensationCandidates: compensation.map { [$0] } ?? []
+                )
+            }
+        }
+    }
+
+    private func compensationCandidate(
+        for event: ReminderEvent,
+        dueAt: Date
+    ) -> ReminderCandidate? {
+        let mode: DailyMode
+        switch event.context {
+        case .work:
+            mode = .work
+        case .idle:
+            mode = .idle
         }
 
-        Task { [weak self] in
-            await self?.refresh()
-        }
+        return ReminderCandidate(
+            behavior: event.behavior,
+            mode: mode,
+            dueAt: dueAt
+        )
     }
 
     private func context(for mode: DailyMode) -> ReminderContext {

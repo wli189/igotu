@@ -3,6 +3,10 @@ import Foundation
 enum ReminderTiming {
     static let historyRetention: TimeInterval = 30 * 24 * 60 * 60
     static let expirationGracePeriod: TimeInterval = 15 * 60
+    static let notificationPlanningHorizon: TimeInterval = 12 * 60 * 60
+    static let maximumPendingBehaviorNotifications = 60
+    static let backgroundRefreshEarliestInterval: TimeInterval = 30 * 60
+    static let compensationDelay: TimeInterval = 9 * 60
     static let defaultSleepReminderLeadTime: TimeInterval = 30 * 60
     static let minimumSleepReminderLeadTime: TimeInterval = 15 * 60
     static let maximumSleepReminderLeadTime: TimeInterval = 120 * 60
