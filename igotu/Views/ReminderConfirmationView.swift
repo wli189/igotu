@@ -45,14 +45,6 @@ struct ReminderConfirmationView: View {
                             .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.top, 10)
-
-                        Text("\(event.context.title) routine")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(accent)
-                            .padding(.top, 14)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(accent.opacity(0.1), in: Capsule())
                     }
                     .frame(maxWidth: 460)
                     .padding(.top, 70)
