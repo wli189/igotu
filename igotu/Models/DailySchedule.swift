@@ -2,18 +2,41 @@
 //  DailySchedule.swift
 //  igotu
 //
-//  Created by Brian Li on 8/19/26.
-//
 
 import Foundation
 
-struct DailySchedule: Codable, Equatable {
-    var sleepStart: DateComponents
-    var sleepEnd: DateComponents
-    var workStart: DateComponents
-    var workEnd: DateComponents
-    var workdays: Set<Weekday>
+struct DailySchedulePeriod: Codable, Equatable, Identifiable {
+    let id: UUID
+    var start: DateComponents
+    var end: DateComponents
+    var days: Set<Weekday>
 
+    init(
+        id: UUID = UUID(),
+        start: DateComponents,
+        end: DateComponents,
+        days: Set<Weekday>
+    ) {
+        self.id = id
+        self.start = start
+        self.end = end
+        self.days = days
+    }
+}
+
+struct DailySchedule: Codable, Equatable {
+    var sleepPeriods: [DailySchedulePeriod]
+    var workPeriods: [DailySchedulePeriod]
+
+    init(
+        sleepPeriods: [DailySchedulePeriod],
+        workPeriods: [DailySchedulePeriod]
+    ) {
+        self.sleepPeriods = sleepPeriods
+        self.workPeriods = workPeriods
+    }
+
+    // This initializer keeps callers and saved data from the first version compatible.
     init(
         sleepStart: DateComponents,
         sleepEnd: DateComponents,
@@ -21,14 +44,23 @@ struct DailySchedule: Codable, Equatable {
         workEnd: DateComponents,
         workdays: Set<Weekday> = Weekday.defaultWorkdays
     ) {
-        self.sleepStart = sleepStart
-        self.sleepEnd = sleepEnd
-        self.workStart = workStart
-        self.workEnd = workEnd
-        self.workdays = workdays
+        self.init(
+            sleepPeriods: [DailySchedulePeriod(
+                start: sleepStart,
+                end: sleepEnd,
+                days: Set(Weekday.allCases)
+            )],
+            workPeriods: [DailySchedulePeriod(
+                start: workStart,
+                end: workEnd,
+                days: workdays
+            )]
+        )
     }
 
     private enum CodingKeys: String, CodingKey {
+        case sleepPeriods
+        case workPeriods
         case sleepStart
         case sleepEnd
         case workStart
@@ -38,42 +70,142 @@ struct DailySchedule: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        sleepStart = try container.decode(DateComponents.self, forKey: .sleepStart)
-        sleepEnd = try container.decode(DateComponents.self, forKey: .sleepEnd)
-        workStart = try container.decode(DateComponents.self, forKey: .workStart)
-        workEnd = try container.decode(DateComponents.self, forKey: .workEnd)
-        workdays = try container.decodeIfPresent(Set<Weekday>.self, forKey: .workdays)
+
+        if let savedSleepPeriods = try container.decodeIfPresent(
+            [DailySchedulePeriod].self,
+            forKey: .sleepPeriods
+        ), let savedWorkPeriods = try container.decodeIfPresent(
+            [DailySchedulePeriod].self,
+            forKey: .workPeriods
+        ) {
+            self.init(
+                sleepPeriods: savedSleepPeriods,
+                workPeriods: savedWorkPeriods
+            )
+            return
+        }
+
+        let sleepStart = try container.decode(DateComponents.self, forKey: .sleepStart)
+        let sleepEnd = try container.decode(DateComponents.self, forKey: .sleepEnd)
+        let workStart = try container.decode(DateComponents.self, forKey: .workStart)
+        let workEnd = try container.decode(DateComponents.self, forKey: .workEnd)
+        let workdays = try container.decodeIfPresent(Set<Weekday>.self, forKey: .workdays)
             ?? Weekday.defaultWorkdays
+
+        self.init(
+            sleepStart: sleepStart,
+            sleepEnd: sleepEnd,
+            workStart: workStart,
+            workEnd: workEnd,
+            workdays: workdays
+        )
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(sleepStart, forKey: .sleepStart)
-        try container.encode(sleepEnd, forKey: .sleepEnd)
-        try container.encode(workStart, forKey: .workStart)
-        try container.encode(workEnd, forKey: .workEnd)
-        try container.encode(workdays, forKey: .workdays)
+        try container.encode(sleepPeriods, forKey: .sleepPeriods)
+        try container.encode(workPeriods, forKey: .workPeriods)
     }
 }
 
 extension DailySchedule {
+    // Legacy accessors remain useful to older callers while the UI moves to period lists.
+    var sleepStart: DateComponents {
+        sleepPeriods.first?.start ?? DateComponents(hour: 23)
+    }
+
+    var sleepEnd: DateComponents {
+        sleepPeriods.first?.end ?? DateComponents(hour: 7)
+    }
+
+    var workStart: DateComponents {
+        workPeriods.first?.start ?? DateComponents(hour: 9)
+    }
+
+    var workEnd: DateComponents {
+        workPeriods.first?.end ?? DateComponents(hour: 18)
+    }
+
+    var workdays: Set<Weekday> {
+        Set(workPeriods.flatMap(\.days))
+    }
+
+    func periods(for mode: DailyMode, on date: Date, calendar: Calendar = .current)
+        -> [DailySchedulePeriod]
+    {
+        let weekday = Weekday(rawValue: calendar.component(.weekday, from: date))
+        let periods = mode == .sleeping ? sleepPeriods : workPeriods
+
+        return periods
+            .filter { period in
+                weekday.map { period.days.contains($0) } ?? false
+            }
+            .sorted { first, second in
+                let firstKey = periodSortKey(first)
+                let secondKey = periodSortKey(second)
+                if firstKey.hour != secondKey.hour {
+                    return firstKey.hour < secondKey.hour
+                }
+                if firstKey.minute != secondKey.minute {
+                    return firstKey.minute < secondKey.minute
+                }
+                return firstKey.id.uuidString < secondKey.id.uuidString
+            }
+    }
+
     func nextSleepStart(
         after date: Date,
         calendar: Calendar = .current
     ) -> Date? {
-        var components = calendar.dateComponents([.year, .month, .day], from: date)
-        components.hour = sleepStart.hour
-        components.minute = sleepStart.minute
-        components.second = 0
+        guard !sleepPeriods.isEmpty else { return nil }
 
-        guard let sleepStartToday = calendar.date(from: components) else {
-            return nil
+        let startOfToday = calendar.startOfDay(for: date)
+
+        for dayOffset in 0...8 {
+            guard let anchor = calendar.date(
+                byAdding: .day,
+                value: dayOffset,
+                to: startOfToday
+            ) else {
+                continue
+            }
+
+            let weekday = Weekday(rawValue: calendar.component(.weekday, from: anchor))
+            let candidates = sleepPeriods.compactMap { period -> Date? in
+                guard let weekday, period.days.contains(weekday) else { return nil }
+                return dateAt(period.start, on: anchor, calendar: calendar)
+            }
+
+            if let next = candidates.filter({ $0 > date }).min() {
+                return next
+            }
         }
 
-        guard sleepStartToday <= date else {
-            return sleepStartToday
-        }
+        return nil
+    }
 
-        return calendar.date(byAdding: .day, value: 1, to: sleepStartToday)
+    private func periodSortKey(_ period: DailySchedulePeriod) -> (
+        hour: Int,
+        minute: Int,
+        id: UUID
+    ) {
+        (
+            period.start.hour ?? 0,
+            period.start.minute ?? 0,
+            period.id
+        )
+    }
+
+    private func dateAt(
+        _ components: DateComponents,
+        on date: Date,
+        calendar: Calendar
+    ) -> Date? {
+        calendar.date(
+            bySettingHour: components.hour ?? 0,
+            minute: components.minute ?? 0,
+            second: 0,
+            of: date
+        )
     }
 }

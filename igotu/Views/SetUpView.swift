@@ -7,6 +7,18 @@
 
 import SwiftUI
 
+private struct SchedulePeriodEditorConfiguration: Identifiable {
+    let id: UUID
+    let mode: DailyMode
+    let period: DailySchedulePeriod?
+
+    init(mode: DailyMode, period: DailySchedulePeriod?) {
+        id = period?.id ?? UUID()
+        self.mode = mode
+        self.period = period
+    }
+}
+
 struct SetUpView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore
     @Environment(\.dismiss) private var dismiss
@@ -15,48 +27,23 @@ struct SetUpView: View {
     private let themeColorService = ThemeColorService()
     private let scheduleValidator = DailyScheduleValidator()
 
-    @State private var sleepStart = Self.time(hour: 23)
-    @State private var sleepEnd = Self.time(hour: 7)
+    @State private var sleepPeriods: [DailySchedulePeriod] = []
+    @State private var workPeriods: [DailySchedulePeriod] = []
     @State private var sleepReminderLeadMinutes = 30
-    @State private var workStart = Self.time(hour: 9)
-    @State private var workEnd = Self.time(hour: 18)
-    @State private var workdays = Weekday.defaultWorkdays
+    @State private var editorConfiguration: SchedulePeriodEditorConfiguration?
     @State private var errorMessage: String?
     @State private var hasLoadedSavedSchedule = false
 
     init(isEditing: Bool = false) {
         self.isEditing = isEditing
     }
-    
-    private func components(from date: Date) -> DateComponents {
-        Calendar.current.dateComponents([.hour, .minute], from: date)
-    }
-    
-    private static func time(hour: Int) -> Date {
-        Calendar.current.date(from: DateComponents(hour: hour))!
-    }
-
-    private static func time(from components: DateComponents) -> Date {
-        Calendar.current.date(
-            from: DateComponents(
-                year: 2000,
-                month: 1,
-                day: 1,
-                hour: components.hour,
-                minute: components.minute
-            )
-        ) ?? .now
-    }
 
     private func loadSavedSchedule() {
         guard !hasLoadedSavedSchedule else { return }
 
-        sleepStart = Self.time(from: configuration.schedule.sleepStart)
-        sleepEnd = Self.time(from: configuration.schedule.sleepEnd)
+        sleepPeriods = configuration.schedule.sleepPeriods
+        workPeriods = configuration.schedule.workPeriods
         sleepReminderLeadMinutes = Int(configuration.sleepReminderLeadTime / 60)
-        workStart = Self.time(from: configuration.schedule.workStart)
-        workEnd = Self.time(from: configuration.schedule.workEnd)
-        workdays = configuration.schedule.workdays
         hasLoadedSavedSchedule = true
     }
     
@@ -77,11 +64,8 @@ struct SetUpView: View {
 
     private var currentSchedule: DailySchedule {
         DailySchedule(
-            sleepStart: components(from: sleepStart),
-            sleepEnd: components(from: sleepEnd),
-            workStart: components(from: workStart),
-            workEnd: components(from: workEnd),
-            workdays: workdays
+            sleepPeriods: sleepPeriods,
+            workPeriods: workPeriods
         )
     }
 
@@ -138,19 +122,10 @@ struct SetUpView: View {
         .onAppear {
             loadSavedSchedule()
         }
-        .onChange(of: sleepStart) { _, _ in
+        .onChange(of: sleepPeriods) { _, _ in
             saveEditedScheduleIfNeeded()
         }
-        .onChange(of: sleepEnd) { _, _ in
-            saveEditedScheduleIfNeeded()
-        }
-        .onChange(of: workStart) { _, _ in
-            saveEditedScheduleIfNeeded()
-        }
-        .onChange(of: workEnd) { _, _ in
-            saveEditedScheduleIfNeeded()
-        }
-        .onChange(of: workdays) { _, _ in
+        .onChange(of: workPeriods) { _, _ in
             saveEditedScheduleIfNeeded()
         }
         .onChange(of: sleepReminderLeadMinutes) { _, _ in
@@ -166,6 +141,20 @@ struct SetUpView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage ?? "")
+        }
+        .sheet(item: $editorConfiguration) { editor in
+            SchedulePeriodEditorView(
+                mode: editor.mode,
+                period: editor.period,
+                onSave: { period in
+                    save(period, for: editor.mode)
+                },
+                onDelete: editor.period.map { period in
+                    { delete(period, from: editor.mode) }
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -188,14 +177,13 @@ struct SetUpView: View {
             sectionHeading("Schedule", systemImage: "calendar", accent: accent)
 
             groupedSurface {
-                VStack(spacing: 0) {
-                    scheduleGroup(
+                VStack(alignment: .leading, spacing: 0) {
+                    schedulePeriodsContent(
                         title: "Sleep",
                         systemImage: "moon.fill",
-                        firstLabel: "Bedtime",
-                        firstSelection: $sleepStart,
-                        secondLabel: "Wake up",
-                        secondSelection: $sleepEnd
+                        mode: .sleeping,
+                        periods: sleepPeriods,
+                        accent: accent
                     )
 
                     sleepReminderContent()
@@ -203,19 +191,13 @@ struct SetUpView: View {
                     Divider()
                         .padding(.leading, 44)
 
-                    scheduleGroup(
+                    schedulePeriodsContent(
                         title: "Work",
                         systemImage: "briefcase.fill",
-                        firstLabel: "Work starts",
-                        firstSelection: $workStart,
-                        secondLabel: "Work ends",
-                        secondSelection: $workEnd
+                        mode: .work,
+                        periods: workPeriods,
+                        accent: accent
                     )
-
-                    Divider()
-                        .padding(.leading, 44)
-
-                    activeDaysContent(accent: accent)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
@@ -284,13 +266,12 @@ struct SetUpView: View {
         )
     }
 
-    private func scheduleGroup(
+    private func schedulePeriodsContent(
         title: String,
         systemImage: String,
-        firstLabel: String,
-        firstSelection: Binding<Date>,
-        secondLabel: String,
-        secondSelection: Binding<Date>
+        mode: DailyMode,
+        periods: [DailySchedulePeriod],
+        accent: Color
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Label(title, systemImage: systemImage)
@@ -298,33 +279,166 @@ struct SetUpView: View {
                 .foregroundStyle(.primary)
                 .padding(.bottom, 2)
 
-            DatePicker(
-                firstLabel,
-                selection: firstSelection,
-                displayedComponents: .hourAndMinute
-            )
+            if periods.isEmpty {
+                Text("No time periods")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 10)
+            } else {
+                ForEach(Array(periods.sorted(by: periodSort).enumerated()), id: \.element.id) { index, period in
+                    if index > 0 {
+                        Divider()
+                            .padding(.leading, 48)
+                    }
 
-            DatePicker(
-                secondLabel,
-                selection: secondSelection,
-                displayedComponents: .hourAndMinute
-            )
-        }
-        .padding(.vertical, 12)
-    }
-
-    private func activeDaysContent(accent: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Active days", systemImage: "calendar.badge.clock")
-                .font(.headline)
-
-            HStack(spacing: 4) {
-                ForEach(Weekday.mondayFirst) { weekday in
-                    dayButton(for: weekday, accent: accent)
+                    periodRow(
+                        period,
+                        mode: mode,
+                        accent: accent
+                    )
                 }
             }
+
+            Button {
+                editorConfiguration = SchedulePeriodEditorConfiguration(
+                    mode: mode,
+                    period: nil
+                )
+            } label: {
+                Label("Add time period", systemImage: "plus.circle.fill")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.borderless)
+            .padding(.top, 10)
         }
         .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func periodRow(
+        _ period: DailySchedulePeriod,
+        mode: DailyMode,
+        accent: Color
+    ) -> some View {
+        Button {
+            editorConfiguration = SchedulePeriodEditorConfiguration(
+                mode: mode,
+                period: period
+            )
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: mode == .sleeping ? "moon.fill" : "clock.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(accent)
+                    .frame(width: 36, height: 36)
+                    .background(accent.opacity(0.12), in: Circle())
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(timeText(period.start) + " – " + timeText(period.end))
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .monospacedDigit()
+
+                    Text(daysText(period.days))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+                    .accessibilityHidden(true)
+            }
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Edit " + mode.title + " time period")
+    }
+
+    private func save(_ period: DailySchedulePeriod, for mode: DailyMode) -> String? {
+        var proposedSleepPeriods = sleepPeriods
+        var proposedWorkPeriods = workPeriods
+
+        if mode == .sleeping {
+            if let index = proposedSleepPeriods.firstIndex(where: { $0.id == period.id }) {
+                proposedSleepPeriods[index] = period
+            } else {
+                proposedSleepPeriods.append(period)
+            }
+        } else {
+            if let index = proposedWorkPeriods.firstIndex(where: { $0.id == period.id }) {
+                proposedWorkPeriods[index] = period
+            } else {
+                proposedWorkPeriods.append(period)
+            }
+        }
+
+        let proposedSchedule = DailySchedule(
+            sleepPeriods: proposedSleepPeriods,
+            workPeriods: proposedWorkPeriods
+        )
+        if let issue = scheduleValidator.issue(for: proposedSchedule) {
+            return issue.message
+        }
+
+        sleepPeriods = proposedSleepPeriods
+        workPeriods = proposedWorkPeriods
+        return nil
+    }
+
+    private func delete(_ period: DailySchedulePeriod, from mode: DailyMode) {
+        if mode == .sleeping {
+            sleepPeriods.removeAll { $0.id == period.id }
+        } else {
+            workPeriods.removeAll { $0.id == period.id }
+        }
+    }
+
+    private func periodSort(
+        _ first: DailySchedulePeriod,
+        _ second: DailySchedulePeriod
+    ) -> Bool {
+        let firstStart = first.start.hour ?? 0
+        let secondStart = second.start.hour ?? 0
+        if firstStart != secondStart {
+            return firstStart < secondStart
+        }
+
+        let firstMinute = first.start.minute ?? 0
+        let secondMinute = second.start.minute ?? 0
+        if firstMinute != secondMinute {
+            return firstMinute < secondMinute
+        }
+
+        return first.id.uuidString < second.id.uuidString
+    }
+
+    private func timeText(_ components: DateComponents) -> String {
+        let date = Calendar.current.date(
+            from: DateComponents(
+                year: 2000,
+                month: 1,
+                day: 1,
+                hour: components.hour,
+                minute: components.minute
+            )
+        ) ?? .now
+
+        return date.formatted(date: .omitted, time: .shortened)
+    }
+
+    private func daysText(_ days: Set<Weekday>) -> String {
+        if days.count == Weekday.allCases.count {
+            return "Every day"
+        }
+
+        return Weekday.mondayFirst
+            .filter { days.contains($0) }
+            .map { $0.shortTitle }
+            .joined(separator: "  ")
     }
 
     private func reminderSection(accent: Color) -> some View {
@@ -456,32 +570,6 @@ struct SetUpView: View {
         .shadow(color: .black.opacity(0.14), radius: 16, y: 8)
         .padding(.horizontal, 20)
         .padding(.bottom, 12)
-    }
-
-    private func dayButton(for weekday: Weekday, accent: Color) -> some View {
-        let isActive = workdays.contains(weekday)
-
-        return Button {
-            if isActive {
-                workdays.remove(weekday)
-            } else {
-                workdays.insert(weekday)
-            }
-        } label: {
-            Text(String(weekday.shortTitle.prefix(1)))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isActive ? .white : accent)
-                .frame(maxWidth: .infinity, minHeight: 36, maxHeight: 36)
-                .background {
-                    Circle()
-                        .fill(isActive ? accent : accent.opacity(0.12))
-                }
-        }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-        .accessibilityLabel(weekday.title)
-        .accessibilityValue(isActive ? "Active" : "Inactive")
-        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
 }

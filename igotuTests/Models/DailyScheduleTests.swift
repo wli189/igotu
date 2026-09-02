@@ -30,6 +30,24 @@ struct DailyScheduleTests {
         #expect(result == makeDate(day: 27, hour: 23))
     }
 
+    @Test func nextSleepStartUsesTheNextSelectedDay() {
+        let schedule = DailySchedule(
+            sleepPeriods: [
+                DailySchedulePeriod(
+                    start: DateComponents(hour: 22),
+                    end: DateComponents(hour: 6),
+                    days: [.friday]
+                )
+            ],
+            workPeriods: []
+        )
+        let date = makeDate(day: 24, hour: 20)
+
+        let result = schedule.nextSleepStart(after: date, calendar: calendar)
+
+        #expect(result == makeDate(day: 28, hour: 22))
+    }
+
     private func makeDate(day: Int, hour: Int, minute: Int = 0) -> Date {
         calendar.date(from: DateComponents(
             year: 2026,

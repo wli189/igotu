@@ -78,27 +78,30 @@ struct DailyScheduleTimeline {
                 continue
             }
 
-            if let sleep = makeInterval(
-                mode: .sleeping,
-                start: schedule.sleepStart,
-                end: schedule.sleepEnd,
-                on: anchor
-            ) {
-                explicitIntervals.append(sleep)
-                boundaries.insert(sleep.start)
-                boundaries.insert(sleep.end)
+            for period in schedule.sleepPeriods where isActive(period, on: anchor) {
+                if let sleep = makeInterval(
+                    mode: .sleeping,
+                    start: period.start,
+                    end: period.end,
+                    on: anchor
+                ) {
+                    explicitIntervals.append(sleep)
+                    boundaries.insert(sleep.start)
+                    boundaries.insert(sleep.end)
+                }
             }
 
-            if isWorkday(anchor, in: schedule.workdays),
-               let work = makeInterval(
-                   mode: .work,
-                   start: schedule.workStart,
-                   end: schedule.workEnd,
-                   on: anchor
-               ) {
-                explicitIntervals.append(work)
-                boundaries.insert(work.start)
-                boundaries.insert(work.end)
+            for period in schedule.workPeriods where isActive(period, on: anchor) {
+                if let work = makeInterval(
+                    mode: .work,
+                    start: period.start,
+                    end: period.end,
+                    on: anchor
+                ) {
+                    explicitIntervals.append(work)
+                    boundaries.insert(work.start)
+                    boundaries.insert(work.end)
+                }
             }
 
             boundaries.insert(anchor)
@@ -177,12 +180,12 @@ struct DailyScheduleTimeline {
         )
     }
 
-    private func isWorkday(_ date: Date, in workdays: Set<Weekday>) -> Bool {
+    private func isActive(_ period: DailySchedulePeriod, on date: Date) -> Bool {
         guard let weekday = Weekday(rawValue: calendar.component(.weekday, from: date)) else {
             return false
         }
 
-        return workdays.contains(weekday)
+        return period.days.contains(weekday)
     }
 
     private func fallbackInterval(at date: Date) -> DailyScheduleInterval {

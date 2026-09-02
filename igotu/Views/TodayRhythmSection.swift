@@ -9,32 +9,83 @@ struct TodayRhythmSection: View {
     let schedule: DailySchedule
     let accent: Color
 
+    private var today: Date {
+        .now
+    }
+
     var body: some View {
+        let sleepPeriods = schedule.periods(for: .sleeping, on: today)
+        let workPeriods = schedule.periods(for: .work, on: today)
+
         VStack(alignment: .leading, spacing: 14) {
             sectionLabel("SCHEDULE")
 
-            VStack(spacing: 0) {
-                RhythmRow(
+            VStack(alignment: .leading, spacing: 0) {
+                scheduleRows(
                     title: "Sleep",
                     icon: "moon.fill",
-                    time: "\(timeText(schedule.sleepStart)) – \(timeText(schedule.sleepEnd))",
+                    periods: sleepPeriods,
+                    emptyTitle: "No sleep schedule",
                     tint: accent
                 )
 
                 Divider()
                     .padding(.leading, 54)
 
-                RhythmRow(
+                scheduleRows(
                     title: "Work",
                     icon: "briefcase.fill",
-                    time: "\(timeText(schedule.workStart)) – \(timeText(schedule.workEnd))",
+                    periods: workPeriods,
+                    emptyTitle: "No work periods",
                     tint: accent
                 )
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .ambientSurface(cornerRadius: 24)
         }
+    }
+
+    private func scheduleRows(
+        title: String,
+        icon: String,
+        periods: [DailySchedulePeriod],
+        emptyTitle: String,
+        tint: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(tint)
+                    .frame(width: 38, height: 38)
+                    .background(tint.opacity(0.12), in: Circle())
+
+                Text(title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+            }
+            .padding(.vertical, 11)
+
+            if periods.isEmpty {
+                Text(emptyTitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 50)
+                    .padding(.bottom, 11)
+            } else {
+                ForEach(periods) { period in
+                    Text(timeText(period.start) + " – " + timeText(period.end))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .monospacedDigit()
+                        .padding(.leading, 50)
+                        .padding(.bottom, 11)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func sectionLabel(_ title: String) -> some View {
@@ -55,34 +106,5 @@ struct TodayRhythmSection: View {
         ) ?? .now
 
         return date.formatted(date: .omitted, time: .shortened)
-    }
-}
-
-private struct RhythmRow: View {
-    let title: String
-    let icon: String
-    let time: String
-    let tint: Color
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(tint)
-                .frame(width: 38, height: 38)
-                .background(tint.opacity(0.12), in: Circle())
-
-            Text(title)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(.primary)
-
-            Spacer(minLength: 8)
-
-            Text(time)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.primary)
-                .monospacedDigit()
-        }
-        .padding(.vertical, 11)
     }
 }

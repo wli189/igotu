@@ -3,6 +3,14 @@ import Testing
 @testable import igotu
 
 struct AppConfigurationStoreTests {
+    private struct LegacySchedule: Encodable {
+        let sleepStart: DateComponents
+        let sleepEnd: DateComponents
+        let workStart: DateComponents
+        let workEnd: DateComponents
+        let workdays: Set<Weekday>
+    }
+
     @Test func restoresSavedScheduleAfterRecreatingStore() {
         let suiteName = "AppConfigurationStoreTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -51,6 +59,34 @@ struct AppConfigurationStoreTests {
         #expect(restoredStore.reminderRule(for: .hydration, in: .idle).isEnabled)
         #expect(restoredStore.reminderRule(for: .movement, in: .idle).frequency == .frequent)
         #expect(restoredStore.reminderRule(for: .movement, in: .work).frequency == .regular)
+    }
+
+    @Test func migratesLegacyScheduleIntoPeriodRules() throws {
+        let suiteName = "LegacyScheduleMigrationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let legacySchedule = LegacySchedule(
+            sleepStart: DateComponents(hour: 23),
+            sleepEnd: DateComponents(hour: 7),
+            workStart: DateComponents(hour: 9),
+            workEnd: DateComponents(hour: 18),
+            workdays: [.monday, .wednesday]
+        )
+        defaults.set(
+            try JSONEncoder().encode(legacySchedule),
+            forKey: "dailySchedule"
+        )
+
+        let store = AppConfigurationStore(defaults: defaults)
+
+        #expect(store.schedule.sleepPeriods.count == 1)
+        #expect(store.schedule.sleepPeriods[0].days == Set(Weekday.allCases))
+        #expect(store.schedule.workPeriods.count == 1)
+        #expect(store.schedule.workPeriods[0].days == [.monday, .wednesday])
+        #expect(store.schedule.workPeriods[0].start.hour == 9)
     }
 
     @Test func restoresDailyGoals() {
