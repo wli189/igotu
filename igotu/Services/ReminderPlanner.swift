@@ -39,10 +39,14 @@ struct ReminderPlanner {
         events: [ReminderEvent],
         now: Date = .now,
         rollingFrom: Date? = nil,
+        rollingBehaviors: Set<Behavior>? = nil,
         compensationCandidates: [ReminderCandidate] = []
     ) -> ReminderPlan {
         let planningStart = rollingFrom ?? now
         let horizonEnd = planningStart.addingTimeInterval(planningHorizon)
+        var behaviorsToPlan = rollingFrom.map { _ in
+            rollingBehaviors ?? Set(Behavior.allCases)
+        } ?? Set(Behavior.allCases)
         let pendingEvents = events
             .filter { $0.status == .scheduled && $0.timestamp >= now }
             .sorted { first, second in
@@ -56,35 +60,37 @@ struct ReminderPlanner {
         var retainedReminders: [PlannedReminder] = []
         var eventIDsToCancel = Set<UUID>()
 
-        if rollingFrom != nil {
-            eventIDsToCancel = Set(
-                events
-                    .filter { $0.status == .scheduled && $0.timestamp >= now }
-                    .map(\.id)
-            )
-        } else {
-            for event in pendingEvents {
-                guard event.timestamp < horizonEnd else {
-                    eventIDsToCancel.insert(event.id)
-                    continue
-                }
+        for event in pendingEvents {
+            let isRollingBehavior = rollingFrom != nil
+                && behaviorsToPlan.contains(event.behavior)
 
-                guard let candidate = validCandidate(
-                    for: event,
-                    schedule: schedule,
-                    workRules: workRules,
-                    idleRules: idleRules,
-                    now: now
-                ) else {
-                    eventIDsToCancel.insert(event.id)
-                    continue
-                }
-
-                retainedReminders.append(PlannedReminder(
-                    eventID: event.id,
-                    candidate: candidate
-                ))
+            guard event.timestamp < horizonEnd else {
+                eventIDsToCancel.insert(event.id)
+                behaviorsToPlan.insert(event.behavior)
+                continue
             }
+
+            guard let candidate = validCandidate(
+                for: event,
+                schedule: schedule,
+                workRules: workRules,
+                idleRules: idleRules,
+                now: now
+            ) else {
+                eventIDsToCancel.insert(event.id)
+                behaviorsToPlan.insert(event.behavior)
+                continue
+            }
+
+            guard !isRollingBehavior else {
+                eventIDsToCancel.insert(event.id)
+                continue
+            }
+
+            retainedReminders.append(PlannedReminder(
+                eventID: event.id,
+                candidate: candidate
+            ))
         }
 
         var planned = retainedReminders
@@ -100,7 +106,8 @@ struct ReminderPlanner {
 
             if rollingFrom != nil,
                event.status == .scheduled,
-               event.timestamp >= now
+               event.timestamp >= now,
+               behaviorsToPlan.contains(event.behavior)
             {
                 return false
             }
@@ -123,6 +130,7 @@ struct ReminderPlanner {
         let validCompensations = compensationCandidates.filter { candidate in
             candidate.dueAt >= planningStart
                 && candidate.dueAt < horizonEnd
+                && behaviorsToPlan.contains(candidate.behavior)
                 && rule(
                     for: candidate.behavior,
                     in: candidate.mode,
@@ -174,7 +182,9 @@ struct ReminderPlanner {
                 continue
             }
 
-            for rule in rules where rule.isEnabled {
+            for rule in rules where
+                rule.isEnabled && behaviorsToPlan.contains(rule.behavior)
+            {
                 var planningNow = max(planningStart, interval.start)
 
                 while planningNow < intervalEnd {
@@ -207,9 +217,7 @@ struct ReminderPlanner {
                     }
 
                     let alreadyPlanned = planned.contains {
-                        $0.candidate.behavior == candidate.behavior
-                            && $0.candidate.mode == candidate.mode
-                            && $0.candidate.dueAt == candidate.dueAt
+                        matches($0, candidate: candidate)
                     }
 
                     if !alreadyPlanned {
@@ -320,5 +328,14 @@ struct ReminderPlanner {
 
         return first.candidate.behavior.reminderPriority
             < second.candidate.behavior.reminderPriority
+    }
+
+    private func matches(
+        _ reminder: PlannedReminder,
+        candidate: ReminderCandidate
+    ) -> Bool {
+        reminder.candidate.behavior == candidate.behavior
+            && reminder.candidate.mode == candidate.mode
+            && reminder.candidate.dueAt == candidate.dueAt
     }
 }

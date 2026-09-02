@@ -229,6 +229,44 @@ struct ReminderPlannerTests {
         #expect(plan.reminders.allSatisfy { $0.eventID == nil })
     }
 
+    @Test func rollingPlanCanReplanOnlyTheAffectedBehavior() {
+        let hydrationEvent = ReminderEvent(
+            behavior: .hydration,
+            context: .work,
+            timestamp: Self.date(year: 2026, month: 8, day: 27, hour: 10, minute: 28),
+            status: .scheduled
+        )
+        let movementEvent = ReminderEvent(
+            behavior: .movement,
+            context: .work,
+            timestamp: Self.date(year: 2026, month: 8, day: 27, hour: 10, minute: 50),
+            status: .scheduled
+        )
+        let completionTime = Self.date(year: 2026, month: 8, day: 27, hour: 10, minute: 5)
+
+        let plan = planner.plan(
+            for: Self.schedule,
+            workRules: [
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .frequent),
+                ReminderRule(behavior: .movement, isEnabled: true, frequency: .regular)
+            ],
+            idleRules: [],
+            events: [hydrationEvent, movementEvent],
+            now: completionTime,
+            rollingFrom: completionTime,
+            rollingBehaviors: [.hydration]
+        )
+
+        #expect(plan.eventIDsToCancel == [hydrationEvent.id])
+        #expect(plan.reminders.contains {
+            $0.eventID == movementEvent.id
+                && $0.candidate.dueAt == movementEvent.timestamp
+        })
+        #expect(plan.reminders.filter {
+            $0.candidate.behavior == .movement
+        }.count == 1)
+    }
+
     @Test func compensationBecomesTheFirstReminderOfTheNewWindow() {
         let skipTime = Self.date(year: 2026, month: 8, day: 27, hour: 10, minute: 5)
         let compensationTime = skipTime.addingTimeInterval(9 * 60)

@@ -59,27 +59,33 @@ final class ReminderHistoryStore: ObservableObject {
         return event
     }
 
+    @discardableResult
     func updateStatus(
         for eventID: UUID,
         to status: ReminderEventStatus,
         at date: Date = .now
-    ) {
+    ) -> Bool {
         var events = currentEvents(now: date)
         guard let index = events.firstIndex(where: { $0.id == eventID }) else {
-            return
+            return false
         }
 
         guard !events[index].status.isTerminal else {
-            return
+            return false
         }
 
         guard events[index].status != status else {
-            return
+            return false
+        }
+
+        guard canTransition(from: events[index].status, to: status) else {
+            return false
         }
 
         events[index].status = status
-        events[index].resolvedAt = date
+        events[index].resolvedAt = status.isTerminal ? date : nil
         persist(events, now: date)
+        return true
     }
 
     @discardableResult
@@ -159,6 +165,26 @@ final class ReminderHistoryStore: ObservableObject {
     private func currentEvents(now: Date) -> [ReminderEvent] {
         let cutoff = now.addingTimeInterval(-retention)
         return events.filter { $0.timestamp >= cutoff }
+    }
+
+    private func canTransition(
+        from currentStatus: ReminderEventStatus,
+        to nextStatus: ReminderEventStatus
+    ) -> Bool {
+        switch currentStatus {
+        case .scheduled:
+            return nextStatus == .delivered
+                || nextStatus == .acknowledged
+                || nextStatus == .skipped
+                || nextStatus == .expired
+                || nextStatus == .cancelled
+        case .delivered:
+            return nextStatus == .acknowledged
+                || nextStatus == .skipped
+                || nextStatus == .expired
+        case .acknowledged, .skipped, .expired, .cancelled:
+            return false
+        }
     }
 
     private static func loadPersistedEvents(from defaults: UserDefaults) -> [ReminderEvent] {

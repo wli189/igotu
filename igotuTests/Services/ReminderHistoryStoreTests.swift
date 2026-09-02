@@ -105,6 +105,47 @@ struct ReminderHistoryStoreTests {
         #expect(store.events.first?.status == .acknowledged)
     }
 
+    @Test func deliveredEventsDoNotHaveAResolutionDate() {
+        let suiteName = "ReminderHistoryDeliveredDateTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = ReminderHistoryStore(defaults: defaults)
+        let now = Date()
+        let event = store.recordScheduled(
+            behavior: .hydration,
+            context: .work,
+            dueAt: now,
+            now: now
+        )
+
+        store.updateStatus(for: event.id, to: .delivered, at: now.addingTimeInterval(1))
+
+        #expect(store.events.first?.status == .delivered)
+        #expect(store.events.first?.resolvedAt == nil)
+    }
+
+    @Test func invalidStatusTransitionsAreIgnored() {
+        let suiteName = "ReminderHistoryTransitionTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = ReminderHistoryStore(defaults: defaults)
+        let now = Date()
+        let event = store.recordScheduled(
+            behavior: .movement,
+            context: .idle,
+            dueAt: now,
+            now: now
+        )
+
+        store.updateStatus(for: event.id, to: .delivered, at: now)
+        store.updateStatus(for: event.id, to: .scheduled, at: now.addingTimeInterval(1))
+
+        #expect(store.status(for: event.id) == .delivered)
+        #expect(store.event(for: event.id)?.resolvedAt == nil)
+    }
+
     @Test func overdueScheduledEventsExpire() {
         let suiteName = "ReminderHistoryExpirationTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

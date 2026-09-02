@@ -13,10 +13,12 @@ final class ReminderCoordinator: ObservableObject {
 
     private struct RefreshRequest {
         let rollingFrom: Date?
+        let rollingBehaviors: Set<Behavior>?
         let compensationCandidates: [ReminderCandidate]
 
         static let normal = RefreshRequest(
             rollingFrom: nil,
+            rollingBehaviors: nil,
             compensationCandidates: []
         )
 
@@ -33,8 +35,24 @@ final class ReminderCoordinator: ObservableObject {
                 rollingFrom = nil
             }
 
+            let rollingBehaviors: Set<Behavior>?
+            if self.rollingFrom == nil {
+                rollingBehaviors = other.rollingFrom == nil
+                    ? nil
+                    : other.rollingBehaviors
+            } else if other.rollingFrom == nil {
+                rollingBehaviors = self.rollingBehaviors
+            } else if let first = self.rollingBehaviors,
+                      let second = other.rollingBehaviors
+            {
+                rollingBehaviors = first.union(second)
+            } else {
+                rollingBehaviors = nil
+            }
+
             return RefreshRequest(
                 rollingFrom: rollingFrom,
+                rollingBehaviors: rollingBehaviors,
                 compensationCandidates: compensationCandidates
                     + other.compensationCandidates
             )
@@ -61,8 +79,11 @@ final class ReminderCoordinator: ObservableObject {
         await refresh(with: .normal)
     }
 
-    func refreshRollingFromNow() async {
-        await refresh(rollingFrom: .now)
+    func refreshRollingFromNow(for behavior: Behavior? = nil) async {
+        await refresh(
+            rollingFrom: .now,
+            rollingBehaviors: behavior.map { Set([$0]) }
+        )
     }
 
     private func refresh(with request: RefreshRequest) async {
@@ -87,10 +108,12 @@ final class ReminderCoordinator: ObservableObject {
 
     private func refresh(
         rollingFrom date: Date,
+        rollingBehaviors: Set<Behavior>? = nil,
         compensationCandidates: [ReminderCandidate] = []
     ) async {
         await refresh(with: RefreshRequest(
             rollingFrom: date,
+            rollingBehaviors: rollingBehaviors,
             compensationCandidates: compensationCandidates
         ))
     }
@@ -144,6 +167,7 @@ final class ReminderCoordinator: ObservableObject {
         )
 
         var rollingFrom = request.rollingFrom
+        var rollingBehaviors = request.rollingBehaviors
         var compensationCandidates = request.compensationCandidates
 
         if !expiredEvents.isEmpty {
@@ -151,6 +175,15 @@ final class ReminderCoordinator: ObservableObject {
                 ReminderTiming.compensationDelay
             )
             rollingFrom = max(rollingFrom ?? compensationDate, compensationDate)
+
+            let expiredBehaviors = Set(expiredEvents.map(\.behavior))
+            if request.rollingFrom == nil {
+                rollingBehaviors = expiredBehaviors
+            } else if let currentRollingBehaviors = rollingBehaviors {
+                var mergedBehaviors = currentRollingBehaviors
+                mergedBehaviors.formUnion(expiredBehaviors)
+                rollingBehaviors = mergedBehaviors
+            }
 
             compensationCandidates += expiredEvents.compactMap { event in
                 compensationCandidate(
@@ -171,6 +204,7 @@ final class ReminderCoordinator: ObservableObject {
             events: history.events,
             now: now,
             rollingFrom: rollingFrom,
+            rollingBehaviors: rollingBehaviors,
             compensationCandidates: compensationCandidates
         )
 
@@ -230,28 +264,53 @@ final class ReminderCoordinator: ObservableObject {
     private func handle(_ action: ReminderAction) {
         switch action {
         case let .delivered(eventID, date):
-            history.updateStatus(for: eventID, to: .delivered, at: date)
+            guard history.updateStatus(for: eventID, to: .delivered, at: date) else {
+                return
+            }
             Task { [weak self] in
                 await self?.refresh()
             }
         case let .acknowledged(eventID, date):
-            history.updateStatus(for: eventID, to: .acknowledged, at: date)
+            guard let event = history.event(for: eventID),
+                  history.updateStatus(
+                      for: eventID,
+                      to: .acknowledged,
+                      at: date
+                  )
+            else {
+                return
+            }
             Task { [weak self] in
-                await self?.refresh(rollingFrom: date)
+                await self?.refresh(
+                    rollingFrom: date,
+                    rollingBehaviors: [event.behavior]
+                )
             }
         case let .skipped(eventID, date):
-            history.updateStatus(for: eventID, to: .skipped, at: date)
+            guard let event = history.event(for: eventID),
+                  history.updateStatus(
+                      for: eventID,
+                      to: .skipped,
+                      at: date
+                  )
+            else {
+                return
+            }
             let compensationDate = date.addingTimeInterval(
                 ReminderTiming.compensationDelay
             )
-            let compensation = history.event(for: eventID).flatMap { event in
-                compensationCandidate(for: event, dueAt: compensationDate)
+            guard let compensation = compensationCandidate(
+                for: event,
+                dueAt: compensationDate
+            ) else {
+                return
             }
 
             Task { [weak self] in
                 await self?.refresh(
                     rollingFrom: compensationDate,
-                    compensationCandidates: compensation.map { [$0] } ?? []
+                    rollingBehaviors: [event.behavior],
+                    compensationCandidates: [compensation]
                 )
             }
         }
