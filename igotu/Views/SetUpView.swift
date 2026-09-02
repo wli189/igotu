@@ -17,6 +17,7 @@ struct SetUpView: View {
 
     @State private var sleepStart = Self.time(hour: 23)
     @State private var sleepEnd = Self.time(hour: 7)
+    @State private var sleepReminderLeadMinutes = 30
     @State private var workStart = Self.time(hour: 9)
     @State private var workEnd = Self.time(hour: 18)
     @State private var workdays = Weekday.defaultWorkdays
@@ -52,6 +53,7 @@ struct SetUpView: View {
 
         sleepStart = Self.time(from: configuration.schedule.sleepStart)
         sleepEnd = Self.time(from: configuration.schedule.sleepEnd)
+        sleepReminderLeadMinutes = Int(configuration.sleepReminderLeadTime / 60)
         workStart = Self.time(from: configuration.schedule.workStart)
         workEnd = Self.time(from: configuration.schedule.workEnd)
         workdays = configuration.schedule.workdays
@@ -67,6 +69,9 @@ struct SetUpView: View {
         }
 
         configuration.save(schedule: schedule)
+        configuration.save(
+            sleepReminderLeadTime: TimeInterval(sleepReminderLeadMinutes * 60)
+        )
         return true
     }
 
@@ -85,6 +90,15 @@ struct SetUpView: View {
         guard currentSchedule != configuration.schedule else { return }
 
         _ = save()
+    }
+
+    private func saveEditedSleepReminderLeadTimeIfNeeded() {
+        guard isEditing, hasLoadedSavedSchedule else { return }
+
+        let leadTime = TimeInterval(sleepReminderLeadMinutes * 60)
+        guard leadTime != configuration.sleepReminderLeadTime else { return }
+
+        configuration.save(sleepReminderLeadTime: leadTime)
     }
 
     var body: some View {
@@ -139,6 +153,9 @@ struct SetUpView: View {
         .onChange(of: workdays) { _, _ in
             saveEditedScheduleIfNeeded()
         }
+        .onChange(of: sleepReminderLeadMinutes) { _, _ in
+            saveEditedSleepReminderLeadTimeIfNeeded()
+        }
         .alert(
             "Cannot Save Schedule",
             isPresented: Binding(
@@ -181,6 +198,8 @@ struct SetUpView: View {
                         secondSelection: $sleepEnd
                     )
 
+                    sleepReminderContent()
+
                     Divider()
                         .padding(.leading, 44)
 
@@ -202,6 +221,67 @@ struct SetUpView: View {
                 .padding(.vertical, 8)
             }
         }
+    }
+
+    private func sleepReminderContent() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Text("Wind down")
+
+                Spacer(minLength: 8)
+
+                Button {
+                    adjustSleepReminderLeadTime(by: -1)
+                } label: {
+                    Image(systemName: "minus")
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.borderless)
+                .background(.quaternary, in: Circle())
+                .accessibilityLabel("Decrease wind down reminder")
+                .disabled(sleepReminderLeadMinutes <= minimumSleepReminderLeadMinutes)
+
+                Text("\(sleepReminderLeadMinutes) min")
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .frame(minWidth: 58)
+                    .multilineTextAlignment(.center)
+
+                Button {
+                    adjustSleepReminderLeadTime(by: 1)
+                } label: {
+                    Image(systemName: "plus")
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(.borderless)
+                .background(.quaternary, in: Circle())
+                .accessibilityLabel("Increase wind down reminder")
+                .disabled(sleepReminderLeadMinutes >= maximumSleepReminderLeadMinutes)
+            }
+        }
+        .padding(.vertical, 12)
+    }
+
+    private var minimumSleepReminderLeadMinutes: Int {
+        Int(ReminderTiming.minimumSleepReminderLeadTime / 60)
+    }
+
+    private var maximumSleepReminderLeadMinutes: Int {
+        Int(ReminderTiming.maximumSleepReminderLeadTime / 60)
+    }
+
+    private var sleepReminderLeadTimeStepMinutes: Int {
+        Int(ReminderTiming.sleepReminderLeadTimeStep / 60)
+    }
+
+    private func adjustSleepReminderLeadTime(by direction: Int) {
+        sleepReminderLeadMinutes = min(
+            max(
+                sleepReminderLeadMinutes + direction * sleepReminderLeadTimeStepMinutes,
+                minimumSleepReminderLeadMinutes
+            ),
+            maximumSleepReminderLeadMinutes
+        )
     }
 
     private func scheduleGroup(
@@ -270,6 +350,17 @@ struct SetUpView: View {
                         accent: accent
                     ) {
                         ReminderSettingsView(context: .idle)
+                    }
+
+                    Divider()
+                        .padding(.leading, 62)
+
+                    settingsLink(
+                        title: "Reminder tests",
+                        systemImage: "bell.badge",
+                        accent: accent
+                    ) {
+                        NotificationTestView()
                     }
                 }
             }

@@ -49,14 +49,12 @@ struct ReminderEngine {
     }
 
     func nextReminders(from input: ReminderEngineInput) -> [ReminderCandidate] {
-        guard let context = context(for: input.mode) else {
+        guard context(for: input.mode) != nil else {
             return []
         }
 
         let lastAnchorByBehavior = Dictionary(
-            grouping: input.recentEvents.filter {
-                $0.context == context && $0.status.countsTowardCooldown
-            },
+            grouping: input.recentEvents.filter { $0.status.countsTowardCooldown },
             by: \.behavior
         ).compactMapValues { events in
             events.compactMap {

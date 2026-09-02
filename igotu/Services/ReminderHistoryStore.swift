@@ -39,6 +39,10 @@ final class ReminderHistoryStore: ObservableObject {
         events.first { $0.id == eventID }?.status
     }
 
+    func event(for eventID: UUID) -> ReminderEvent? {
+        events.first { $0.id == eventID }
+    }
+
     func recordScheduled(
         behavior: Behavior,
         context: ReminderContext,

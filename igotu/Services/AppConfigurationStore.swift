@@ -15,6 +15,7 @@ final class AppConfigurationStore: ObservableObject {
         static let workReminders = "workReminders"
         static let idleReminders = "idleReminders"
         static let dailyGoals = "dailyGoals"
+        static let sleepReminderLeadTime = "sleepReminderLeadTime"
     }
 
     private static let defaultSchedule = DailySchedule(
@@ -41,6 +42,7 @@ final class AppConfigurationStore: ObservableObject {
     @Published private(set) var workReminders: [ReminderRule]
     @Published private(set) var idleReminders: [ReminderRule]
     @Published private(set) var dailyGoals: DailyGoals
+    @Published private(set) var sleepReminderLeadTime: TimeInterval
     @Published private(set) var hasCompletedSetup: Bool
 
     private let defaults: UserDefaults
@@ -58,6 +60,7 @@ final class AppConfigurationStore: ObservableObject {
             defaultValue: Self.defaultIdleReminders
         )
         dailyGoals = Self.loadDailyGoals(from: defaults)
+        sleepReminderLeadTime = Self.loadSleepReminderLeadTime(from: defaults)
 
         guard
             let data = defaults.data(forKey: Key.schedule),
@@ -90,6 +93,15 @@ final class AppConfigurationStore: ObservableObject {
         if let data = try? JSONEncoder().encode(normalizedGoals) {
             defaults.set(data, forKey: Key.dailyGoals)
         }
+    }
+
+    func save(sleepReminderLeadTime: TimeInterval) {
+        let normalizedLeadTime = Self.normalizedSleepReminderLeadTime(
+            sleepReminderLeadTime
+        )
+
+        self.sleepReminderLeadTime = normalizedLeadTime
+        defaults.set(normalizedLeadTime, forKey: Key.sleepReminderLeadTime)
     }
 
     func reminderRule(for behavior: Behavior, in context: ReminderContext) -> ReminderRule {
@@ -143,6 +155,28 @@ final class AppConfigurationStore: ObservableObject {
         }
 
         return goals.normalized
+    }
+
+    private static func loadSleepReminderLeadTime(
+        from defaults: UserDefaults
+    ) -> TimeInterval {
+        let storedValue = ((defaults.object(
+            forKey: Key.sleepReminderLeadTime
+        ) as? NSNumber)?.doubleValue) ?? ReminderTiming.defaultSleepReminderLeadTime
+
+        return normalizedSleepReminderLeadTime(storedValue)
+    }
+
+    private static func normalizedSleepReminderLeadTime(
+        _ value: TimeInterval
+    ) -> TimeInterval {
+        let clampedValue = min(
+            max(value, ReminderTiming.minimumSleepReminderLeadTime),
+            ReminderTiming.maximumSleepReminderLeadTime
+        )
+        let step = ReminderTiming.sleepReminderLeadTimeStep
+
+        return (clampedValue / step).rounded() * step
     }
 
     private static func normalizedReminderRules(

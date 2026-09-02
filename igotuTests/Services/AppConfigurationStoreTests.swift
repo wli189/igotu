@@ -66,6 +66,36 @@ struct AppConfigurationStoreTests {
         #expect(restoredStore.dailyGoals == DailyGoals(hydrationCount: 10, standingHours: 12))
     }
 
+    @Test func restoresCustomSleepReminderLeadTime() {
+        let suiteName = "SleepReminderLeadTimeTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let firstStore = AppConfigurationStore(defaults: defaults)
+        firstStore.save(sleepReminderLeadTime: 45 * 60)
+
+        let restoredStore = AppConfigurationStore(defaults: defaults)
+
+        #expect(restoredStore.sleepReminderLeadTime == 45 * 60)
+    }
+
+    @Test func clampsSleepReminderLeadTimeToSupportedRange() {
+        let suiteName = "SleepReminderLeadTimeNormalizationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = AppConfigurationStore(defaults: defaults)
+        store.save(sleepReminderLeadTime: 0)
+        #expect(store.sleepReminderLeadTime == 15 * 60)
+
+        store.save(sleepReminderLeadTime: 180 * 60)
+        #expect(store.sleepReminderLeadTime == 120 * 60)
+    }
+
     @Test func normalizesSavedDailyGoalsOnLoad() throws {
         let suiteName = "DailyGoalsNormalizationTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
