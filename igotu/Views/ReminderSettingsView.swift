@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 struct ReminderSettingsView: View {
@@ -179,7 +180,7 @@ private struct FrequencyEditorView: View {
     }
 
     private var intervalOptions: [TimeInterval] {
-        let defaults: [TimeInterval] = [15, 30, 45, 60, 90, 120].map { $0 * 60 }
+        let defaults: [TimeInterval] = [15, 30, 45, 60, 120, 180, 240, 300, 360].map { $0 * 60 }
         return Array(Set(defaults + [frequency.interval])).sorted()
     }
 
@@ -249,7 +250,18 @@ private struct FrequencyEditorView: View {
     }
 
     private func intervalTitle(for interval: TimeInterval) -> String {
-        "\(Int((interval / 60).rounded())) min"
+        let minutes = interval / 60
+        if minutes >= 60 {
+            let hours = minutes / 60
+            if hours.rounded() == hours {
+                let wholeHours = Int(hours)
+                return wholeHours == 1 ? "1 hour" : "\(wholeHours) hours"
+            }
+
+            return "\(String(format: "%.1f", hours)) hours"
+        }
+
+        return "\(Int(minutes.rounded())) min"
     }
 
     private func nearestOffsetMinutes(
