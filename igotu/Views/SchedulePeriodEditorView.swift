@@ -11,8 +11,14 @@ struct SchedulePeriodEditorView: View {
     @State private var start: Date
     @State private var end: Date
     @State private var days: Set<Weekday>
+    @State private var expandedTimePicker: TimePicker?
     @State private var errorMessage: String?
     @State private var showsDeleteConfirmation = false
+
+    private enum TimePicker: Equatable {
+        case start
+        case end
+    }
 
     private var accent: Color {
         ThemeColorService().color(for: mode.wellnessTheme)
@@ -110,16 +116,16 @@ struct SchedulePeriodEditorView: View {
                 .font(.headline)
                 .padding(.bottom, 8)
 
-            DatePicker(
-                mode == .sleeping ? "Bedtime" : "Work starts",
+            timePickerRow(
+                title: mode == .sleeping ? "Bedtime" : "Work starts",
                 selection: $start,
-                displayedComponents: .hourAndMinute
+                picker: .start
             )
 
-            DatePicker(
-                mode == .sleeping ? "Wake up" : "Work ends",
+            timePickerRow(
+                title: mode == .sleeping ? "Wake up" : "Work ends",
                 selection: $end,
-                displayedComponents: .hourAndMinute
+                picker: .end
             )
 
             Divider()
@@ -137,6 +143,51 @@ struct SchedulePeriodEditorView: View {
         }
         .padding(20)
         .ambientSurface(cornerRadius: 24)
+    }
+
+    private func timePickerRow(
+        title: String,
+        selection: Binding<Date>,
+        picker: TimePicker
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    expandedTimePicker = expandedTimePicker == picker ? nil : picker
+                }
+            } label: {
+                HStack {
+                    Text(title)
+
+                    Spacer()
+
+                    HStack(spacing: 8) {
+                        Text(selection.wrappedValue.formatted(date: .omitted, time: .shortened))
+                            .foregroundStyle(.secondary)
+
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(minHeight: 44)
+            }
+
+            if expandedTimePicker == picker {
+                DatePicker(
+                    title,
+                    selection: selection,
+                    displayedComponents: .hourAndMinute
+                )
+                .datePickerStyle(.wheel)
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+                .frame(height: 180)
+                .clipped()
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func dayButton(for weekday: Weekday) -> some View {
