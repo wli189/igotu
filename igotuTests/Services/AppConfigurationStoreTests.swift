@@ -73,6 +73,46 @@ struct AppConfigurationStoreTests {
         #expect(restoredStore.reminderRule(for: .movement, in: .work).frequency == .regular)
     }
 
+    @Test func restoresCustomFrequencySettings() {
+        let suiteName = "CustomFrequencyTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let firstStore = AppConfigurationStore(defaults: defaults)
+        firstStore.setReminderFrequency(
+            ReminderFrequency(
+                interval: 45 * 60,
+                offsetRange: -5 * 60 ... 10 * 60
+            ),
+            for: .hydration,
+            in: .work
+        )
+
+        let restoredStore = AppConfigurationStore(defaults: defaults)
+        let frequency = restoredStore.reminderRule(
+            for: .hydration,
+            in: .work
+        ).frequency
+
+        #expect(frequency.isCustom)
+        #expect(frequency.interval == 45 * 60)
+        #expect(frequency.offsetRange == -5 * 60 ... 10 * 60)
+    }
+
+    @Test func decodesFrequencyPresetsSavedByThePreviousModel() throws {
+        let data = try JSONSerialization.data(withJSONObject: [
+            [
+                "behavior": "hydration",
+                "isEnabled": true,
+                "frequency": "regular"
+            ]
+        ])
+
+        let rules = try JSONDecoder().decode([ReminderRule].self, from: data)
+
+        #expect(rules.first?.frequency == .regular)
+    }
+
     @Test func migratesLegacyScheduleIntoPeriodRules() throws {
         let suiteName = "LegacyScheduleMigrationTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

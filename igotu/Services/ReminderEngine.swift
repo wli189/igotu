@@ -117,6 +117,7 @@ struct ReminderEngine {
         frequency: ReminderFrequency,
         now: Date
     ) -> Date {
+        // Keep the schedule formula stable: reference point + interval + offset.
         let targetDate = date.addingTimeInterval(
             frequency.interval + offsetProvider(frequency)
         )

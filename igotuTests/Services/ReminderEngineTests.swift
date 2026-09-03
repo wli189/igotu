@@ -12,6 +12,32 @@ struct ReminderEngineTests {
         #expect(ReminderFrequency.frequent.interval == 30 * 60)
     }
 
+    @Test func maximumOffsetScalesWithInterval() {
+        #expect(ReminderFrequency.maximumOffsetMinutes(for: 15 * 60) == 3)
+        #expect(ReminderFrequency.maximumOffsetMinutes(for: 30 * 60) == 6)
+        #expect(ReminderFrequency.maximumOffsetMinutes(for: 60 * 60) == 12)
+    }
+
+    @Test func customFrequencyUsesItsIntervalAndOffsetRange() throws {
+        let frequency = ReminderFrequency(
+            interval: 45 * 60,
+            offsetRange: -5 * 60 ... 10 * 60
+        )
+        let engine = ReminderEngine(offsetProvider: { frequency in
+            #expect(frequency == ReminderFrequency(
+                interval: 45 * 60,
+                offsetRange: -5 * 60 ... 10 * 60
+            ))
+            return 10 * 60
+        })
+
+        let result = try #require(engine.nextReminder(from: input(rules: [
+            ReminderRule(behavior: .hydration, isEnabled: true, frequency: frequency)
+        ])))
+
+        #expect(result.dueAt == now.addingTimeInterval(55 * 60))
+    }
+
     @Test func sleepingModeDoesNotProduceReminder() {
         let result = engine.nextReminder(from: input(mode: .sleeping))
 

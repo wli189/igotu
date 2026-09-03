@@ -15,14 +15,29 @@ struct ReminderSettingsView: View {
     var body: some View {
         let accent = themeColorService.currentColor(for: configuration.schedule)
 
-        Form {
-            Section("Reminders") {
-                ForEach(rules) { rule in
-                    reminderRow(for: rule.behavior)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Reminders", systemImage: "bell.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(accent)
+
+                VStack(spacing: 0) {
+                    ForEach(rules.indices, id: \.self) { index in
+                        reminderRow(for: rules[index].behavior)
+
+                        if index < rules.count - 1 {
+                            Divider()
+                                .padding(.leading, 16)
+                        }
+                    }
                 }
+                .ambientSurface(cornerRadius: 24)
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 24)
         }
-        .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
         .background {
             AmbientBackground(color: accent)
         }
@@ -44,20 +59,226 @@ struct ReminderSettingsView: View {
             }
 
             if rule.isEnabled {
-                Picker(
-                    "Frequency",
-                    selection: Binding(
-                        get: { configuration.reminderRule(for: behavior, in: context).frequency },
-                        set: { configuration.setReminderFrequency($0, for: behavior, in: context) }
-                    )
-                ) {
-                    ForEach(ReminderFrequency.allCases) { frequency in
-                        Text(frequency.title).tag(frequency)
-                    }
-                }
-                .pickerStyle(.menu)
+                FrequencyEditorView(behavior: behavior, context: context)
             }
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+}
+
+private struct FrequencyEditorView: View {
+    @EnvironmentObject private var configuration: AppConfigurationStore
+
+    let behavior: Behavior
+    let context: ReminderContext
+
+    private enum PresentedPicker: String, Identifiable {
+        case interval
+        case offset
+
+        var id: String { rawValue }
+    }
+
+    @State private var presentedPicker: PresentedPicker?
+
+    private var frequency: ReminderFrequency {
+        configuration.reminderRule(for: behavior, in: context).frequency
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            pickerRow(
+                title: "Every",
+                value: intervalTitle(for: frequency.interval),
+                picker: .interval
+            )
+
+            pickerRow(
+                title: "Offset",
+                value: currentOffset.title,
+                picker: .offset
+            )
+        }
+        .padding(.top, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var currentOffset: OffsetOption {
+        OffsetOption(
+            lowerBound: frequency.offsetRange.lowerBound / 60,
+            upperBound: frequency.offsetRange.upperBound / 60
+        )
+    }
+
+    private func pickerRow(
+        title: String,
+        value: String,
+        picker: PresentedPicker
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    presentedPicker = presentedPicker == picker ? nil : picker
+                }
+            } label: {
+                HStack {
+                    Text(title)
+
+                    Spacer()
+
+                    HStack(spacing: 8) {
+                        Text(value)
+                            .foregroundStyle(.secondary)
+
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color(.secondarySystemFill), in: Capsule())
+                }
+            }
+
+            if presentedPicker == picker {
+                pickerView(for: picker)
+                    .labelsHidden()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 180)
+                    .clipped()
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityValue(value)
+    }
+
+    @ViewBuilder
+    private func pickerView(for picker: PresentedPicker) -> some View {
+        switch picker {
+        case .interval:
+            Picker("Interval", selection: intervalBinding) {
+                ForEach(intervalOptions, id: \.self) { interval in
+                    Text(intervalTitle(for: interval)).tag(interval)
+                }
+            }
+            .pickerStyle(.wheel)
+
+        case .offset:
+            Picker("Offset", selection: offsetBinding) {
+                ForEach(offsetOptions) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+            .pickerStyle(.wheel)
+        }
+    }
+
+    private var intervalOptions: [TimeInterval] {
+        let defaults: [TimeInterval] = [15, 30, 45, 60, 90, 120].map { $0 * 60 }
+        return Array(Set(defaults + [frequency.interval])).sorted()
+    }
+
+    private var offsetOptions: [OffsetOption] {
+        let defaults = Array(0 ... maxOffsetMinutes).map { minutes in
+            OffsetOption(lowerBound: -Double(minutes), upperBound: Double(minutes))
+        }
+
+        let current = OffsetOption(
+            lowerBound: frequency.offsetRange.lowerBound / 60,
+            upperBound: frequency.offsetRange.upperBound / 60
+        )
+        return Array(Set(defaults + [current])).sorted {
+            let leftMagnitude = max(abs($0.lowerBound), abs($0.upperBound))
+            let rightMagnitude = max(abs($1.lowerBound), abs($1.upperBound))
+
+            if leftMagnitude == rightMagnitude {
+                return $0.lowerBound < $1.lowerBound
+            }
+
+            return leftMagnitude < rightMagnitude
+        }
+    }
+
+    private var maxOffsetMinutes: Int {
+        ReminderFrequency.maximumOffsetMinutes(for: frequency.interval)
+    }
+
+    private var intervalBinding: Binding<TimeInterval> {
+        Binding(
+            get: { frequency.interval },
+            set: { interval in
+                let currentOffsetMinutes = max(
+                    abs(frequency.offsetRange.lowerBound / 60),
+                    abs(frequency.offsetRange.upperBound / 60)
+                )
+                let maximumOffsetMinutes = Double(
+                    ReminderFrequency.maximumOffsetMinutes(for: interval)
+                )
+                let offsetMinutes = min(currentOffsetMinutes, maximumOffsetMinutes)
+
+                configuration.setReminderFrequency(
+                    ReminderFrequency(
+                        interval: interval,
+                        offsetRange: -offsetMinutes * 60 ... offsetMinutes * 60
+                    ),
+                    for: behavior,
+                    in: context
+                )
+            }
+        )
+    }
+
+    private var offsetBinding: Binding<OffsetOption> {
+        Binding(
+            get: {
+                OffsetOption(
+                    lowerBound: frequency.offsetRange.lowerBound / 60,
+                    upperBound: frequency.offsetRange.upperBound / 60
+                )
+            },
+            set: { option in
+                configuration.setReminderFrequency(
+                    ReminderFrequency(interval: frequency.interval, offsetRange: option.range),
+                    for: behavior,
+                    in: context
+                )
+            }
+        )
+    }
+
+    private func intervalTitle(for interval: TimeInterval) -> String {
+        "\(Int((interval / 60).rounded())) min"
+    }
+}
+
+private struct OffsetOption: Hashable, Identifiable {
+    let lowerBound: Double
+    let upperBound: Double
+
+    var id: String {
+        "\(lowerBound)-\(upperBound)"
+    }
+
+    var range: ClosedRange<TimeInterval> {
+        lowerBound * 60 ... upperBound * 60
+    }
+
+    var title: String {
+        if lowerBound == 0, upperBound == 0 {
+            return "None"
+        }
+
+        if lowerBound == -upperBound {
+            return "+/- \(minuteTitle(upperBound))"
+        }
+
+        return "\(minuteTitle(lowerBound)) to +\(minuteTitle(upperBound))"
+    }
+
+    private func minuteTitle(_ minutes: Double) -> String {
+        "\(Int(minutes.rounded())) min"
     }
 }
 
