@@ -29,10 +29,6 @@ struct ReminderToastView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
-
-                    Text("\(event.context.title) routine")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(accent)
                 }
 
                 Spacer(minLength: 0)
