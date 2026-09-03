@@ -5,6 +5,7 @@ import Combine
 final class ReminderCoordinator: ObservableObject {
     @Published private(set) var toastReminders: [ReminderEvent] = []
     @Published private(set) var fullScreenReminder: ReminderEvent?
+    @Published private(set) var isShowingExpiredReminderToast = false
 
     private let configuration: AppConfigurationStore
     private let planner: ReminderPlanner
@@ -13,6 +14,8 @@ final class ReminderCoordinator: ObservableObject {
 
     private var refreshInProgress = false
     private var queuedRefreshRequest: RefreshRequest?
+    private var toastExpirationTasks: [UUID: Task<Void, Never>] = [:]
+    private var expiredToastDismissalTask: Task<Void, Never>?
 
     private struct RefreshRequest {
         let rollingFrom: Date?
@@ -170,6 +173,7 @@ final class ReminderCoordinator: ObservableObject {
         let eventIDs = scheduledTestEventIDs.union(notificationEventIDs)
         history.cancelTestEvents(withIDs: eventIDs)
 
+        cancelToastExpirations(for: eventIDs)
         toastReminders.removeAll { eventIDs.contains($0.id) }
         if let fullScreenReminder,
            eventIDs.contains(fullScreenReminder.id)
@@ -201,6 +205,7 @@ final class ReminderCoordinator: ObservableObject {
 
         if !expiredEvents.isEmpty {
             let expiredEventIDs = Set(expiredEvents.map(\.id))
+            cancelToastExpirations(for: expiredEventIDs)
             toastReminders.removeAll { expiredEventIDs.contains($0.id) }
             if let fullScreenReminder,
                expiredEventIDs.contains(fullScreenReminder.id)
@@ -311,16 +316,39 @@ final class ReminderCoordinator: ObservableObject {
                 await self?.refresh()
             }
         case let .opened(eventID, date):
-            guard let event = history.event(for: eventID),
-                  !event.status.isTerminal
-            else {
+            guard let event = history.event(for: eventID) else {
                 return
             }
+
+            let expirationDate = event.timestamp.addingTimeInterval(
+                ReminderTiming.expirationGracePeriod
+            )
+            if event.status == .expired ||
+                (!event.status.isTerminal && expirationDate <= date)
+            {
+                let didExpireOnOpen = history.updateStatus(
+                    for: eventID,
+                    to: .expired,
+                    at: date
+                )
+                removePrompt(for: eventID)
+                showExpiredReminderToast()
+
+                if didExpireOnOpen && !event.isTest {
+                    Task { [weak self] in
+                        await self?.refresh()
+                    }
+                }
+                return
+            }
+
+            guard !event.status.isTerminal else { return }
 
             if event.status == .scheduled {
                 _ = history.updateStatus(for: eventID, to: .delivered, at: date)
             }
 
+            cancelToastExpiration(for: eventID)
             toastReminders.removeAll { $0.id == eventID }
             fullScreenReminder = history.event(for: eventID)
         case let .acknowledged(eventID, date):
@@ -395,12 +423,63 @@ final class ReminderCoordinator: ObservableObject {
         }
 
         toastReminders.append(event)
+        scheduleToastExpiration(for: event)
     }
 
     private func removePrompt(for eventID: UUID) {
+        cancelToastExpiration(for: eventID)
         toastReminders.removeAll { $0.id == eventID }
         if fullScreenReminder?.id == eventID {
             fullScreenReminder = nil
+        }
+    }
+
+    private func scheduleToastExpiration(for event: ReminderEvent) {
+        cancelToastExpiration(for: event.id)
+
+        let expirationDate = event.timestamp.addingTimeInterval(
+            ReminderTiming.expirationGracePeriod
+        )
+        let delay = max(0, expirationDate.timeIntervalSinceNow)
+
+        toastExpirationTasks[event.id] = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(delay))
+            } catch {
+                return
+            }
+
+            guard let self else { return }
+            toastExpirationTasks[event.id] = nil
+            await refresh()
+        }
+    }
+
+    private func cancelToastExpiration(for eventID: UUID) {
+        toastExpirationTasks.removeValue(forKey: eventID)?.cancel()
+    }
+
+    private func cancelToastExpirations(for eventIDs: Set<UUID>) {
+        for eventID in eventIDs {
+            cancelToastExpiration(for: eventID)
+        }
+    }
+
+    private func showExpiredReminderToast() {
+        expiredToastDismissalTask?.cancel()
+        isShowingExpiredReminderToast = true
+
+        expiredToastDismissalTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(
+                    for: .seconds(ReminderTiming.expiredToastPresentationDuration)
+                )
+            } catch {
+                return
+            }
+
+            self?.isShowingExpiredReminderToast = false
+            self?.expiredToastDismissalTask = nil
         }
     }
 

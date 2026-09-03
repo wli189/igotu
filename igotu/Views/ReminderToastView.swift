@@ -63,6 +63,29 @@ struct ReminderToastView: View {
     }
 }
 
+struct ExpiredReminderToastView: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "clock.badge.exclamationmark")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 36, height: 36)
+                .background(.secondary.opacity(0.12), in: Circle())
+
+            Text("This reminder has expired")
+                .font(.subheadline.weight(.semibold))
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .ambientSurface(cornerRadius: 18)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 #Preview {
     ReminderToastView(
         event: ReminderEvent(

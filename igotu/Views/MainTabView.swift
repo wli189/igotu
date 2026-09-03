@@ -55,7 +55,11 @@ struct MainTabView: View {
             refreshTheme()
         }
         .overlay(alignment: .top) {
-            if let event = reminderCoordinator.toastReminders.first {
+            if reminderCoordinator.isShowingExpiredReminderToast {
+                ExpiredReminderToastView()
+                    .safeAreaPadding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            } else if let event = reminderCoordinator.toastReminders.first {
                 ReminderToastView(
                     event: event,
                     onAcknowledge: {
@@ -69,6 +73,10 @@ struct MainTabView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .animation(
+            .easeInOut(duration: 0.22),
+            value: reminderCoordinator.isShowingExpiredReminderToast
+        )
         .fullScreenCover(
             isPresented: Binding(
                 get: { reminderCoordinator.fullScreenReminder != nil },
