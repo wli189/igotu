@@ -102,6 +102,9 @@ private struct FrequencyEditorView: View {
         }
         .padding(.top, 4)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear {
+            normalizeOffsetIfNeeded()
+        }
     }
 
     private var currentOffset: OffsetOption {
@@ -181,28 +184,22 @@ private struct FrequencyEditorView: View {
     }
 
     private var offsetOptions: [OffsetOption] {
-        let defaults = Array(0 ... maxOffsetMinutes).map { minutes in
+        offsetTierMinutes.map { minutes in
             OffsetOption(lowerBound: -Double(minutes), upperBound: Double(minutes))
-        }
-
-        let current = OffsetOption(
-            lowerBound: frequency.offsetRange.lowerBound / 60,
-            upperBound: frequency.offsetRange.upperBound / 60
-        )
-        return Array(Set(defaults + [current])).sorted {
-            let leftMagnitude = max(abs($0.lowerBound), abs($0.upperBound))
-            let rightMagnitude = max(abs($1.lowerBound), abs($1.upperBound))
-
-            if leftMagnitude == rightMagnitude {
-                return $0.lowerBound < $1.lowerBound
-            }
-
-            return leftMagnitude < rightMagnitude
         }
     }
 
     private var maxOffsetMinutes: Int {
         ReminderFrequency.maximumOffsetMinutes(for: frequency.interval)
+    }
+
+    private var offsetTierMinutes: [Int] {
+        Array(Set([
+            0,
+            Int((Double(maxOffsetMinutes) / 3).rounded()),
+            Int((Double(maxOffsetMinutes) * 2 / 3).rounded()),
+            maxOffsetMinutes
+        ])).sorted()
     }
 
     private var intervalBinding: Binding<TimeInterval> {
@@ -216,7 +213,10 @@ private struct FrequencyEditorView: View {
                 let maximumOffsetMinutes = Double(
                     ReminderFrequency.maximumOffsetMinutes(for: interval)
                 )
-                let offsetMinutes = min(currentOffsetMinutes, maximumOffsetMinutes)
+                let offsetMinutes = nearestOffsetMinutes(
+                    to: min(currentOffsetMinutes, maximumOffsetMinutes),
+                    for: interval
+                )
 
                 configuration.setReminderFrequency(
                     ReminderFrequency(
@@ -251,6 +251,50 @@ private struct FrequencyEditorView: View {
     private func intervalTitle(for interval: TimeInterval) -> String {
         "\(Int((interval / 60).rounded())) min"
     }
+
+    private func nearestOffsetMinutes(
+        to minutes: Double,
+        for interval: TimeInterval
+    ) -> Double {
+        let maximum = ReminderFrequency.maximumOffsetMinutes(for: interval)
+        let tiers = Set([
+            0,
+            Int((Double(maximum) / 3).rounded()),
+            Int((Double(maximum) * 2 / 3).rounded()),
+            maximum
+        ])
+
+        return Double(tiers.min {
+            let leftDistance = abs(Double($0) - minutes)
+            let rightDistance = abs(Double($1) - minutes)
+            return leftDistance == rightDistance ? $0 < $1 : leftDistance < rightDistance
+        } ?? 0)
+    }
+
+    private func normalizeOffsetIfNeeded() {
+        let currentMinutes = max(
+            abs(frequency.offsetRange.lowerBound / 60),
+            abs(frequency.offsetRange.upperBound / 60)
+        )
+        let normalizedMinutes = nearestOffsetMinutes(
+            to: currentMinutes,
+            for: frequency.interval
+        )
+
+        guard currentMinutes != normalizedMinutes
+            || frequency.offsetRange.lowerBound != -normalizedMinutes * 60
+            || frequency.offsetRange.upperBound != normalizedMinutes * 60
+        else { return }
+
+        configuration.setReminderFrequency(
+            ReminderFrequency(
+                interval: frequency.interval,
+                offsetRange: -normalizedMinutes * 60 ... normalizedMinutes * 60
+            ),
+            for: behavior,
+            in: context
+        )
+    }
 }
 
 private struct OffsetOption: Hashable, Identifiable {
@@ -271,7 +315,7 @@ private struct OffsetOption: Hashable, Identifiable {
         }
 
         if lowerBound == -upperBound {
-            return "+/- \(minuteTitle(upperBound))"
+            return minuteTitle(upperBound)
         }
 
         return "\(minuteTitle(lowerBound)) to +\(minuteTitle(upperBound))"
