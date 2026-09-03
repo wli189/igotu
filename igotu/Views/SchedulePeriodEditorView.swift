@@ -54,7 +54,6 @@ struct SchedulePeriodEditorView: View {
             .background {
                 AmbientBackground(color: accent)
             }
-            .tint(accent)
             .navigationTitle(mode.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -102,6 +101,7 @@ struct SchedulePeriodEditorView: View {
                 Button("Cancel", role: .cancel) { }
             }
         }
+        .tint(accent)
     }
 
     private var editorSurface: some View {
