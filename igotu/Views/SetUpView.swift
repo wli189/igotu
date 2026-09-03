@@ -186,7 +186,9 @@ struct SetUpView: View {
                         accent: accent
                     )
 
-                    sleepReminderContent()
+                    if !sleepPeriods.isEmpty {
+                        sleepReminderContent()
+                    }
 
                     Divider()
                         .padding(.leading, 44)

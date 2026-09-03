@@ -42,6 +42,18 @@ struct AppConfigurationStoreTests {
         #expect(restoredStore.schedule.workEnd.minute == 30)
     }
 
+    @Test func startsWithAnEmptyScheduleBeforeSetup() {
+        let suiteName = "EmptyScheduleDefaultsTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = AppConfigurationStore(defaults: defaults)
+
+        #expect(!store.hasCompletedSetup)
+        #expect(store.schedule.sleepPeriods.isEmpty)
+        #expect(store.schedule.workPeriods.isEmpty)
+    }
+
     @Test func restoresReminderRulesIndependentlyForWorkAndIdle() {
         let suiteName = "ReminderRulesTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!

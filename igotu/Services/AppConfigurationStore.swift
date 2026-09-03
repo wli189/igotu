@@ -19,11 +19,8 @@ final class AppConfigurationStore: ObservableObject {
     }
 
     private static let defaultSchedule = DailySchedule(
-        sleepStart: DateComponents(hour: 23),
-        sleepEnd: DateComponents(hour: 7),
-        workStart: DateComponents(hour: 9),
-        workEnd: DateComponents(hour: 18),
-        workdays: Weekday.defaultWorkdays
+        sleepPeriods: [],
+        workPeriods: []
     )
 
     private static let defaultWorkReminders = [
