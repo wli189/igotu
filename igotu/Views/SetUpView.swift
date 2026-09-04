@@ -375,6 +375,14 @@ struct SetUpView: View {
             return "Every day"
         }
 
+        if days == Weekday.defaultWorkdays {
+            return "Weekday"
+        }
+
+        if days == [.saturday, .sunday] {
+            return "Weekend"
+        }
+
         return Weekday.mondayFirst
             .filter { days.contains($0) }
             .map { $0.shortTitle }
