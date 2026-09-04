@@ -55,18 +55,18 @@ Replace the simulator name/OS with a destination from `-showdestinations` when t
 
 ### Current implementation
 
-- `igotu/igotuApp.swift` is the `@main` SwiftUI entry point. It creates the configuration and history stores and injects them into the app views.
-- `Shared/Models/` contains the schedule, mode, behavior, frequency, rule, goal, and reminder-event models. `DailyMode` and `Behavior` own their stable keys, display metadata, and reminder-specific values.
-- `Shared/Services/DailyScheduleTimeline.swift` is the single source of truth for schedule intervals, including sleep and work intervals that cross midnight. `DailyModeManager` and `DailyModeProgressCalculator` consume it.
-- `Shared/Services/ReminderEngine.swift` calculates deterministic reminder candidates from rules and history. It is retained as domain logic for the replacement notification architecture.
-- `Shared/Services/ReminderPlanner.swift` builds a bounded rolling plan of multiple reminders per enabled behavior and can replan only selected behaviors.
-- `igotu/Services/ReminderCoordinator.swift` reconciles reminder events with local notification requests and routes notification actions back through the event lifecycle.
-- `igotu/Services/NotificationScheduler.swift` is the local notification adapter. `ReminderBackgroundScheduler` requests periodic refresh opportunities to replenish the rolling plan.
-- `igotu/Views/MainTabView.swift` uses the existing TabView navigation for compact iPhone layouts and a NavigationSplitView sidebar for regular-width iPad layouts. Today and setup content use a bounded reading column on larger screens.
-- Behavior options in `NotificationTestView` create test events that reuse the production notification payload and confirmation flow; test events are excluded from planning and daily metrics. Wind Down testing remains a standalone notification.
-- `igotu/Views/ReminderToastView.swift` renders foreground reminder actions, while `ReminderConfirmationView.swift` renders the full-screen confirmation route opened from a notification.
-- `Shared/Services/AppConfigurationStore.swift` persists configuration in `UserDefaults` and normalizes legacy or incomplete rules/goals on load. `ReminderHistoryStore` persists a bounded event history and applies cooldown, expiration, and completion rules.
-- `igotu/Assets.xcassets` contains the app icon and theme color catalogs. The Xcode project uses filesystem-synchronized groups, so Swift files added under app, extension, shared, or test directories are picked up automatically.
+- `igotu/App/igotuApp.swift` is the `@main` SwiftUI entry point. It creates the configuration and history stores and injects them into the app views.
+- `igotu/Models/` contains the schedule, mode, behavior, frequency, rule, goal, reminder-event, and wellness-theme models. `DailyMode` and `Behavior` own their stable keys, display metadata, and reminder-specific values.
+- `igotu/Services/Core/DailyScheduleTimeline.swift` is the single source of truth for schedule intervals, including sleep and work intervals that cross midnight. `DailyModeManager` and `DailyModeProgressCalculator` consume it.
+- `igotu/Services/Core/ReminderEngine.swift` calculates deterministic reminder candidates from rules and history. It is retained as domain logic for the replacement notification architecture.
+- `igotu/Services/Core/ReminderPlanner.swift` builds a bounded rolling plan of multiple reminders per enabled behavior and can replan only selected behaviors.
+- `igotu/Services/iOS/ReminderCoordinator.swift` reconciles reminder events with local notification requests and routes notification actions back through the event lifecycle.
+- `igotu/Services/iOS/NotificationScheduler.swift` is the local notification adapter. `ReminderBackgroundScheduler` requests periodic refresh opportunities to replenish the rolling plan.
+- `igotu/Navigation/MainTabView.swift` uses the existing TabView navigation for compact iPhone layouts and a NavigationSplitView sidebar for regular-width iPad layouts. Today and setup content use a bounded reading column on larger screens.
+- Behavior options in `igotu/Views/Reminders/NotificationTestView.swift` create test events that reuse the production notification payload and confirmation flow; test events are excluded from planning and daily metrics. Wind Down testing remains a standalone notification.
+- `igotu/Views/Reminders/ReminderToastView.swift` renders foreground reminder actions, while `ReminderConfirmationView.swift` renders the full-screen confirmation route opened from a notification.
+- `igotu/Services/Core/AppConfigurationStore.swift` persists configuration in `UserDefaults` and normalizes legacy or incomplete rules/goals on load. `ReminderHistoryStore` persists a bounded event history and applies cooldown, expiration, and completion rules.
+- `igotu/Resources/Assets.xcassets` contains the app icon and theme color catalogs. The Xcode project uses filesystem-synchronized groups, so Swift files added under app, extension, or test directories are picked up automatically.
 
 ### Test targets
 
@@ -90,9 +90,33 @@ Keep schedule decisions in value-returning modules and keep platform effects beh
 
 New UI should follow the Ambient Calm specification in `DESIGN.md`: native SwiftUI, dynamic light/dark colors, material-backed cards, restrained context-specific accents, and calm transitions/haptics. The product document's home screen is intended to answer “What should I do right now?” rather than present a dense health dashboard.
 
+### Directory layout policy
+
+The canonical application layout keeps all current software code under `igotu/`:
+
+```text
+igotu/
+├── App/                         # App entry point and composition
+├── Models/                      # Platform-neutral domain models
+├── Services/
+│   ├── Core/                    # Scheduling, reminder logic, persistence
+│   └── iOS/                     # iOS and iPadOS system adapters
+├── Views/
+│   ├── Today/                   # Today feature views
+│   ├── Schedule/                # Setup and schedule editing views
+│   └── Reminders/               # Reminder settings and presentation views
+├── Navigation/                 # iPhone tabs and iPad sidebar navigation
+├── DesignSystem/               # Shared SwiftUI styling and theme services
+└── Resources/                  # Asset catalogs and app resources
+```
+
+iPhone and iPadOS use the same target and the same `Services/iOS` implementation. UI differences are handled with size classes and adaptive SwiftUI layouts; do not create separate iPhone and iPad source trees. All new application code belongs under the canonical `igotu/` layout above.
+
+When a native macOS target is introduced, extract `igotu/Models/` and `igotu/Services/Core/` into an `IgotuCore` package or framework. Keep iOS adapters in `Services/iOS/` and add macOS adapters under the macOS target.
+
 ## Repository conventions
 
-- Keep shared models and platform-neutral services in `Shared/`, app code in `igotu/`, unit tests in `igotuTests/`, and UI tests in `igotuUITests/`; the synchronized Xcode groups make the directory location part of target membership.
+- Keep models and platform-neutral services under `igotu/`, app code in `igotu/`, unit tests in `igotuTests/`, and UI tests in `igotuUITests/`; the synchronized Xcode groups make the directory location part of target membership.
 - Preserve SwiftUI previews with in-memory model containers so previews do not write to the persistent store.
 - Keep scheduling, time-zone, and configuration behavior covered by focused tests before changing shared modules.
 - The repository has no package manager, custom lint command, or separate generated source step. Use Xcode compiler warnings and `xcodebuild` for verification.

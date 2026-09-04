@@ -30,11 +30,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A10000000000000000000002 /* Shared */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = Shared;
-			sourceTree = "<group>";
-		};
 		D34C240D3033C5A800CBCA6B /* igotu */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = igotu;
@@ -81,7 +76,6 @@
 			isa = PBXGroup;
 			children = (
 				D34C240D3033C5A800CBCA6B /* igotu */,
-				A10000000000000000000002 /* Shared */,
 				D34C241D3033C5A900CBCA6B /* igotuTests */,
 				D34C24273033C5A900CBCA6B /* igotuUITests */,
 				D34C240C3033C5A800CBCA6B /* Products */,
@@ -114,7 +108,6 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				A10000000000000000000002 /* Shared */,
 				D34C240D3033C5A800CBCA6B /* igotu */,
 			);
 			name = igotu;
