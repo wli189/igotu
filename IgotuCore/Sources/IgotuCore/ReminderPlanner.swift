@@ -1,24 +1,29 @@
 import Foundation
 
-struct PlannedReminder: Equatable {
-    let eventID: UUID?
-    let candidate: ReminderCandidate
+public struct PlannedReminder: Equatable {
+    public let eventID: UUID?
+    public let candidate: ReminderCandidate
+
+    public init(eventID: UUID?, candidate: ReminderCandidate) {
+        self.eventID = eventID
+        self.candidate = candidate
+    }
 }
 
-struct ReminderPlan: Equatable {
-    let reminders: [PlannedReminder]
-    let eventIDsToCancel: Set<UUID>
+public struct ReminderPlan: Equatable {
+    public let reminders: [PlannedReminder]
+    public let eventIDsToCancel: Set<UUID>
 }
 
 /// Builds the desired reminder set without touching persistence or platform APIs.
-struct ReminderPlanner {
+public struct ReminderPlanner {
     private let engine: ReminderEngine
     private let timeline: DailyScheduleTimeline
     private let intervalLimit: Int
     private let planningHorizon: TimeInterval
     private let maximumReminderCount: Int
 
-    init(
+    public init(
         engine: ReminderEngine,
         timeline: DailyScheduleTimeline = DailyScheduleTimeline(),
         intervalLimit: Int = 32,
@@ -32,7 +37,7 @@ struct ReminderPlanner {
         self.maximumReminderCount = max(0, maximumReminderCount)
     }
 
-    func plan(
+    public func plan(
         for schedule: DailySchedule,
         workRules: [ReminderRule],
         idleRules: [ReminderRule],

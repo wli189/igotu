@@ -1,14 +1,14 @@
 import Foundation
 
-struct DailyScheduleValidator {
-    enum Issue: Equatable {
+public struct DailyScheduleValidator {
+    public enum Issue: Equatable {
         case sleepTimesMatch
         case workTimesMatch
         case sleepPeriodsOverlap
         case workPeriodsOverlap
         case sleepAndWorkOverlap
 
-        var message: String {
+        public var message: String {
             switch self {
             case .sleepTimesMatch:
                 return "Your bedtime and wake-up time cannot be the same."
@@ -32,7 +32,9 @@ struct DailyScheduleValidator {
         let end: Int
     }
 
-    func issue(for schedule: DailySchedule) -> Issue? {
+    public init() {}
+
+    public func issue(for schedule: DailySchedule) -> Issue? {
         if schedule.sleepPeriods.contains(where: { timesMatch($0) }) {
             return .sleepTimesMatch
         }

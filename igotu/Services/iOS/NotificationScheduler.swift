@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import IgotuCore
 
 @MainActor
 final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationCenterDelegate {

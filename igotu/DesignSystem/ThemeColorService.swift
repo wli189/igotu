@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import IgotuCore
 
 struct ThemeColorService {
     private let modeManager: DailyModeManager

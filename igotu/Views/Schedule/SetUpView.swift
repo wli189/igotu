@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IgotuCore
 
 private struct SchedulePeriodEditorConfiguration: Identifiable {
     let id: UUID

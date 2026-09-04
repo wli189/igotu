@@ -1,16 +1,22 @@
 import Foundation
 
-struct DailyScheduleInterval: Equatable {
-    let mode: DailyMode
-    let start: Date
-    let end: Date
+public struct DailyScheduleInterval: Equatable {
+    public let mode: DailyMode
+    public let start: Date
+    public let end: Date
 
-    func contains(_ date: Date) -> Bool {
+    public init(mode: DailyMode, start: Date, end: Date) {
+        self.mode = mode
+        self.start = start
+        self.end = end
+    }
+
+    public func contains(_ date: Date) -> Bool {
         start <= date && date < end
     }
 }
 
-struct DailyScheduleTimeline {
+public struct DailyScheduleTimeline {
     private struct ExplicitInterval {
         let mode: DailyMode
         let start: Date
@@ -23,11 +29,11 @@ struct DailyScheduleTimeline {
 
     private let calendar: Calendar
 
-    init(calendar: Calendar = .current) {
+    public init(calendar: Calendar = .current) {
         self.calendar = calendar
     }
 
-    func currentInterval(
+    public func currentInterval(
         for schedule: DailySchedule,
         at date: Date = .now
     ) -> DailyScheduleInterval {
@@ -37,7 +43,7 @@ struct DailyScheduleTimeline {
             ?? fallbackInterval(at: date)
     }
 
-    func intervals(
+    public func intervals(
         for schedule: DailySchedule,
         startingAt date: Date = .now,
         count: Int

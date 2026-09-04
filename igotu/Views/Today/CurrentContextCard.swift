@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import IgotuCore
 
 struct CurrentContextCard: View {
     let mode: DailyMode

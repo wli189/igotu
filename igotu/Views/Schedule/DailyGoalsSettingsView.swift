@@ -1,4 +1,5 @@
 import SwiftUI
+import IgotuCore
 
 struct DailyGoalsSettingsView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore

@@ -5,12 +5,12 @@
 //  Created by Brian Li on 8/19/26.
 //
 
-enum DailyMode: Equatable {
+public enum DailyMode: Equatable {
     case sleeping
     case work
     case idle
 
-    var title: String {
+    public var title: String {
         switch self {
         case .sleeping: return "Sleeping"
         case .work: return "Work"
@@ -18,7 +18,7 @@ enum DailyMode: Equatable {
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .sleeping: return "moon.fill"
         case .work: return "briefcase.fill"
@@ -26,7 +26,7 @@ enum DailyMode: Equatable {
         }
     }
 
-    var wellnessTheme: WellnessTheme {
+    public var wellnessTheme: WellnessTheme {
         switch self {
         case .sleeping: return .sleep
         case .work: return .work
@@ -34,7 +34,7 @@ enum DailyMode: Equatable {
         }
     }
 
-    var key: String {
+    public var key: String {
         switch self {
         case .sleeping: return "sleeping"
         case .work: return "work"
@@ -42,7 +42,7 @@ enum DailyMode: Equatable {
         }
     }
 
-    init?(key: String) {
+    public init?(key: String) {
         switch key {
         case "sleeping": self = .sleeping
         case "work": self = .work

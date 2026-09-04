@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import IgotuCore
 
 struct NotificationTestView: View {
     @EnvironmentObject private var reminderCoordinator: ReminderCoordinator

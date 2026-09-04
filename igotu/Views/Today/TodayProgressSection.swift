@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import IgotuCore
 
 struct TodayProgressSection: View {
     let metrics: DailyMetrics

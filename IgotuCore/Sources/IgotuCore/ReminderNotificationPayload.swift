@@ -1,22 +1,22 @@
 import Foundation
 
-struct ReminderNotificationPayload: Equatable {
+public struct ReminderNotificationPayload: Equatable {
     private enum Key {
         static let kind = "kind"
         static let version = "version"
         static let eventID = "eventID"
     }
 
-    static let behaviorKind = "behavior-reminder"
-    static let currentVersion = 1
+    public static let behaviorKind = "behavior-reminder"
+    public static let currentVersion = 1
 
-    let eventID: UUID
+    public let eventID: UUID
 
-    init(eventID: UUID) {
+    public init(eventID: UUID) {
         self.eventID = eventID
     }
 
-    init?(userInfo: [AnyHashable: Any]) {
+    public init?(userInfo: [AnyHashable: Any]) {
         guard
             userInfo[Key.kind] as? String == Self.behaviorKind,
             let version = Self.integer(from: userInfo[Key.version]),
@@ -30,7 +30,7 @@ struct ReminderNotificationPayload: Equatable {
         self.init(eventID: eventID)
     }
 
-    var userInfo: [AnyHashable: Any] {
+    public var userInfo: [AnyHashable: Any] {
         [
             Key.kind: Self.behaviorKind,
             Key.version: Self.currentVersion,
@@ -38,7 +38,7 @@ struct ReminderNotificationPayload: Equatable {
         ]
     }
 
-    static func eventID(from userInfo: [AnyHashable: Any]) -> UUID? {
+    public static func eventID(from userInfo: [AnyHashable: Any]) -> UUID? {
         ReminderNotificationPayload(userInfo: userInfo)?.eventID
     }
 

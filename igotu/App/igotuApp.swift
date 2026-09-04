@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IgotuCore
 
 @main
 struct igotuApp: App {

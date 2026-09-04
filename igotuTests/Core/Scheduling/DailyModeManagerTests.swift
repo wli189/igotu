@@ -7,6 +7,7 @@
 
 import Foundation
 import XCTest
+import IgotuCore
 @testable import igotu
 
 final class DailyModeManagerTests: XCTestCase {

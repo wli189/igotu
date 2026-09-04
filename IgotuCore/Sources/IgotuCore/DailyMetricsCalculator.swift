@@ -1,13 +1,15 @@
 import Foundation
 
-struct DailyMetrics: Equatable {
-    let hydrationCount: Int
-    let standingHours: Int
-    let goals: DailyGoals
+public struct DailyMetrics: Equatable {
+    public let hydrationCount: Int
+    public let standingHours: Int
+    public let goals: DailyGoals
 }
 
-struct DailyMetricsCalculator {
-    func calculate(
+public struct DailyMetricsCalculator {
+    public init() {}
+
+    public func calculate(
         events: [ReminderEvent],
         goals: DailyGoals,
         calendar: Calendar = .current

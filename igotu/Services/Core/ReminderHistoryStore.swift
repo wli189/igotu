@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import IgotuCore
 
 final class ReminderHistoryStore: ObservableObject {
     private enum Key {

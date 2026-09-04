@@ -1,4 +1,5 @@
 import SwiftUI
+import IgotuCore
 
 struct SchedulePeriodEditorView: View {
     @Environment(\.dismiss) private var dismiss

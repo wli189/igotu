@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Combine
+import IgotuCore
 
 struct MainTabView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore

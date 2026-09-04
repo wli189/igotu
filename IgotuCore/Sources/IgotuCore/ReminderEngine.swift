@@ -1,13 +1,13 @@
 import Foundation
 
-struct ReminderEngineInput {
-    let now: Date
-    let mode: DailyMode
-    let rules: [ReminderRule]
-    let recentEvents: [ReminderEvent]
-    let activeInterval: DailyScheduleInterval?
+public struct ReminderEngineInput {
+    public let now: Date
+    public let mode: DailyMode
+    public let rules: [ReminderRule]
+    public let recentEvents: [ReminderEvent]
+    public let activeInterval: DailyScheduleInterval?
 
-    init(
+    public init(
         now: Date,
         mode: DailyMode,
         rules: [ReminderRule],
@@ -22,19 +22,25 @@ struct ReminderEngineInput {
     }
 }
 
-struct ReminderCandidate: Equatable {
-    let behavior: Behavior
-    let mode: DailyMode
-    let dueAt: Date
+public struct ReminderCandidate: Equatable {
+    public let behavior: Behavior
+    public let mode: DailyMode
+    public let dueAt: Date
+
+    public init(behavior: Behavior, mode: DailyMode, dueAt: Date) {
+        self.behavior = behavior
+        self.mode = mode
+        self.dueAt = dueAt
+    }
 }
 
-struct ReminderEngine {
-    typealias OffsetProvider = (ReminderFrequency) -> TimeInterval
+public struct ReminderEngine {
+    public typealias OffsetProvider = (ReminderFrequency) -> TimeInterval
 
     private let offsetProvider: OffsetProvider
     private let expirationGracePeriod: TimeInterval
 
-    init(
+    public init(
         offsetProvider: @escaping OffsetProvider = { frequency in
             Double.random(in: frequency.offsetRange)
         },
@@ -44,11 +50,11 @@ struct ReminderEngine {
         self.expirationGracePeriod = expirationGracePeriod
     }
 
-    func nextReminder(from input: ReminderEngineInput) -> ReminderCandidate? {
+    public func nextReminder(from input: ReminderEngineInput) -> ReminderCandidate? {
         nextReminders(from: input).first
     }
 
-    func nextReminders(from input: ReminderEngineInput) -> [ReminderCandidate] {
+    public func nextReminders(from input: ReminderEngineInput) -> [ReminderCandidate] {
         guard context(for: input.mode) != nil else {
             return []
         }

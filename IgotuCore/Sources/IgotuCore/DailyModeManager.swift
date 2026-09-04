@@ -7,21 +7,21 @@
 
 import Foundation
 
-struct DailyModeManager {
+public struct DailyModeManager {
     private let timeline: DailyScheduleTimeline
 
-    init(calendar: Calendar = .current) {
+    public init(calendar: Calendar = .current) {
         timeline = DailyScheduleTimeline(calendar: calendar)
     }
 
-    func currentInterval(
+    public func currentInterval(
         for schedule: DailySchedule,
         at date: Date = .now
     ) -> DailyScheduleInterval {
         timeline.currentInterval(for: schedule, at: date)
     }
     
-    func currentMode(
+    public func currentMode(
             for schedule: DailySchedule,
             at date: Date = .now
     ) -> DailyMode {

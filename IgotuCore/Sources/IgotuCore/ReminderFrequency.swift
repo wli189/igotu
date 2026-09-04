@@ -7,8 +7,8 @@
 
 import Foundation
 
-struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
-    enum Preset: String, Codable {
+public struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
+    public enum Preset: String, Codable {
         case occasional
         case regular
         case frequent
@@ -21,11 +21,11 @@ struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
         case offsetUpperBound
     }
 
-    let preset: Preset?
-    let interval: TimeInterval
-    let offsetRange: ClosedRange<TimeInterval>
+    public let preset: Preset?
+    public let interval: TimeInterval
+    public let offsetRange: ClosedRange<TimeInterval>
 
-    var id: String {
+    public var id: String {
         if let preset {
             return preset.rawValue
         }
@@ -33,13 +33,13 @@ struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
         return "custom-\(interval)-\(offsetRange.lowerBound)-\(offsetRange.upperBound)"
     }
 
-    var isCustom: Bool { preset == nil }
+    public var isCustom: Bool { preset == nil }
 
-    static func maximumOffsetMinutes(for interval: TimeInterval) -> Int {
+    public static func maximumOffsetMinutes(for interval: TimeInterval) -> Int {
         max(1, Int((interval / 60 / 5).rounded(.down)))
     }
 
-    var title: String {
+    public var title: String {
         switch preset {
         case .occasional: return "Occasional"
         case .regular: return "Regular"
@@ -48,27 +48,27 @@ struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
         }
     }
 
-    static let occasional = ReminderFrequency(
+    public static let occasional = ReminderFrequency(
         preset: .occasional,
         interval: 2 * 60 * 60,
         offsetRange: -12 * 60 ... 12 * 60
     )
 
-    static let regular = ReminderFrequency(
+    public static let regular = ReminderFrequency(
         preset: .regular,
         interval: 60 * 60,
         offsetRange: -7 * 60 ... 7 * 60
     )
 
-    static let frequent = ReminderFrequency(
+    public static let frequent = ReminderFrequency(
         preset: .frequent,
         interval: 30 * 60,
         offsetRange: -3 * 60 ... 3 * 60
     )
 
-    static let allCases = [occasional, regular, frequent]
+    public static let allCases = [occasional, regular, frequent]
 
-    init(interval: TimeInterval, offsetRange: ClosedRange<TimeInterval>) {
+    public init(interval: TimeInterval, offsetRange: ClosedRange<TimeInterval>) {
         self.init(
             preset: nil,
             interval: interval,
@@ -89,7 +89,7 @@ struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
         self.offsetRange = lowerBound ... upperBound
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let singleValue = try decoder.singleValueContainer()
 
         // Rules saved before custom frequencies were introduced encoded the
@@ -131,7 +131,7 @@ struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
         )
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(preset, forKey: .preset)
         try container.encode(interval, forKey: .interval)

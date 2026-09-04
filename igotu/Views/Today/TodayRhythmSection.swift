@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import IgotuCore
 
 struct TodayRhythmSection: View {
     let schedule: DailySchedule

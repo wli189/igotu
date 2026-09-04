@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import IgotuCore
 
 struct TodayView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore

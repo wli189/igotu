@@ -5,14 +5,14 @@
 //  Created by Brian Li on 8/19/26.
 //
 
-enum Behavior: String, CaseIterable, Codable, Identifiable {
+public enum Behavior: String, CaseIterable, Codable, Identifiable {
     case hydration
     case standUp
     case movement
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    var title: String {
+    public var title: String {
         switch self {
         case .hydration: return "Drink Water"
         case .standUp: return "Stand Up"
@@ -20,7 +20,7 @@ enum Behavior: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    var icon: String {
+    public var icon: String {
         switch self {
         case .hydration: return "drop.fill"
         case .standUp: return "figure.stand"
@@ -28,7 +28,7 @@ enum Behavior: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    var reminderPriority: Int {
+    public var reminderPriority: Int {
         switch self {
         case .standUp: return 0
         case .hydration: return 1
@@ -36,7 +36,7 @@ enum Behavior: String, CaseIterable, Codable, Identifiable {
         }
     }
 
-    var reminderMessage: String {
+    public var reminderMessage: String {
         switch self {
         case .hydration:
             return "Take a moment to drink some water."

@@ -1,11 +1,11 @@
 import Foundation
 
-struct ScheduledTestNotification: Identifiable, Equatable {
-    enum Kind: Equatable {
+public struct ScheduledTestNotification: Identifiable, Equatable {
+    public enum Kind: Equatable {
         case behavior(Behavior)
         case sleepReminder
 
-        var title: String {
+        public var title: String {
             switch self {
             case let .behavior(behavior):
                 return behavior.title
@@ -14,7 +14,7 @@ struct ScheduledTestNotification: Identifiable, Equatable {
             }
         }
 
-        var icon: String {
+        public var icon: String {
             switch self {
             case let .behavior(behavior):
                 return behavior.icon
@@ -24,7 +24,13 @@ struct ScheduledTestNotification: Identifiable, Equatable {
         }
     }
 
-    let id: String
-    let kind: Kind
-    let fireDate: Date
+    public let id: String
+    public let kind: Kind
+    public let fireDate: Date
+
+    public init(id: String, kind: Kind, fireDate: Date) {
+        self.id = id
+        self.kind = kind
+        self.fireDate = fireDate
+    }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-enum Weekday: Int, CaseIterable, Codable, Hashable, Identifiable {
+public enum Weekday: Int, CaseIterable, Codable, Hashable, Identifiable {
     case sunday = 1
     case monday = 2
     case tuesday = 3
@@ -9,9 +9,9 @@ enum Weekday: Int, CaseIterable, Codable, Hashable, Identifiable {
     case friday = 6
     case saturday = 7
 
-    var id: Int { rawValue }
+    public var id: Int { rawValue }
 
-    var title: String {
+    public var title: String {
         switch self {
         case .sunday: return "Sunday"
         case .monday: return "Monday"
@@ -23,7 +23,7 @@ enum Weekday: Int, CaseIterable, Codable, Hashable, Identifiable {
         }
     }
 
-    var shortTitle: String {
+    public var shortTitle: String {
         switch self {
         case .sunday: return "Sun"
         case .monday: return "Mon"
@@ -35,7 +35,7 @@ enum Weekday: Int, CaseIterable, Codable, Hashable, Identifiable {
         }
     }
 
-    static let defaultWorkdays: Set<Weekday> = [
+    public static let defaultWorkdays: Set<Weekday> = [
         .monday,
         .tuesday,
         .wednesday,
@@ -43,7 +43,7 @@ enum Weekday: Int, CaseIterable, Codable, Hashable, Identifiable {
         .friday
     ]
 
-    static let mondayFirst: [Weekday] = [
+    public static let mondayFirst: [Weekday] = [
         .monday,
         .tuesday,
         .wednesday,

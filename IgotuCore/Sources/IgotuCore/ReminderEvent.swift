@@ -1,18 +1,28 @@
 import Foundation
 
-struct ReminderTestTiming: Codable, Equatable {
-    let notificationDelay: TimeInterval
-    let expirationGracePeriod: TimeInterval
-    let repeatDelay: TimeInterval
+public struct ReminderTestTiming: Codable, Equatable {
+    public let notificationDelay: TimeInterval
+    public let expirationGracePeriod: TimeInterval
+    public let repeatDelay: TimeInterval
 
-    static let defaultValue = ReminderTestTiming(
+    public init(
+        notificationDelay: TimeInterval,
+        expirationGracePeriod: TimeInterval,
+        repeatDelay: TimeInterval
+    ) {
+        self.notificationDelay = notificationDelay
+        self.expirationGracePeriod = expirationGracePeriod
+        self.repeatDelay = repeatDelay
+    }
+
+    public static let defaultValue = ReminderTestTiming(
         notificationDelay: ReminderTiming.testNotificationDelay,
         expirationGracePeriod: ReminderTiming.testExpirationGracePeriod,
         repeatDelay: ReminderTiming.testRepeatDelay
     )
 }
 
-enum ReminderEventStatus: String, Codable {
+public enum ReminderEventStatus: String, Codable {
     case scheduled
     case delivered
     case acknowledged
@@ -20,7 +30,7 @@ enum ReminderEventStatus: String, Codable {
     case expired
     case cancelled
 
-    var isTerminal: Bool {
+    public var isTerminal: Bool {
         switch self {
         case .acknowledged, .skipped, .expired, .cancelled:
             return true
@@ -29,11 +39,11 @@ enum ReminderEventStatus: String, Codable {
         }
     }
 
-    var countsTowardCompletion: Bool {
+    public var countsTowardCompletion: Bool {
         self == .acknowledged
     }
 
-    var countsTowardCooldown: Bool {
+    public var countsTowardCooldown: Bool {
         switch self {
         case .scheduled, .delivered, .acknowledged, .skipped, .expired:
             return true
@@ -43,17 +53,17 @@ enum ReminderEventStatus: String, Codable {
     }
 }
 
-struct ReminderEvent: Identifiable, Codable, Equatable {
-    let id: UUID
-    let behavior: Behavior
-    let context: ReminderContext
-    let isTest: Bool
-    let testTiming: ReminderTestTiming?
-    var timestamp: Date
-    var status: ReminderEventStatus
-    var resolvedAt: Date?
+public struct ReminderEvent: Identifiable, Codable, Equatable {
+    public let id: UUID
+    public let behavior: Behavior
+    public let context: ReminderContext
+    public let isTest: Bool
+    public let testTiming: ReminderTestTiming?
+    public var timestamp: Date
+    public var status: ReminderEventStatus
+    public var resolvedAt: Date?
 
-    init(
+    public init(
         id: UUID = UUID(),
         behavior: Behavior,
         context: ReminderContext,
@@ -77,7 +87,7 @@ struct ReminderEvent: Identifiable, Codable, Equatable {
         case id, behavior, context, isTest, testTiming, timestamp, status, resolvedAt
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         behavior = try container.decode(Behavior.self, forKey: .behavior)
@@ -92,7 +102,7 @@ struct ReminderEvent: Identifiable, Codable, Equatable {
         resolvedAt = try container.decodeIfPresent(Date.self, forKey: .resolvedAt)
     }
 
-    func cooldownAnchor(expirationGracePeriod: TimeInterval) -> Date? {
+    public func cooldownAnchor(expirationGracePeriod: TimeInterval) -> Date? {
         switch status {
         case .scheduled, .delivered:
             return timestamp

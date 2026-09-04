@@ -1,5 +1,6 @@
 import BackgroundTasks
 import Foundation
+import IgotuCore
 
 @MainActor
 final class ReminderBackgroundScheduler {

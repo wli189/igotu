@@ -5,13 +5,13 @@
 
 import Foundation
 
-struct DailySchedulePeriod: Codable, Equatable, Identifiable {
-    let id: UUID
-    var start: DateComponents
-    var end: DateComponents
-    var days: Set<Weekday>
+public struct DailySchedulePeriod: Codable, Equatable, Identifiable {
+    public let id: UUID
+    public var start: DateComponents
+    public var end: DateComponents
+    public var days: Set<Weekday>
 
-    init(
+    public init(
         id: UUID = UUID(),
         start: DateComponents,
         end: DateComponents,
@@ -24,11 +24,11 @@ struct DailySchedulePeriod: Codable, Equatable, Identifiable {
     }
 }
 
-struct DailySchedule: Codable, Equatable {
-    var sleepPeriods: [DailySchedulePeriod]
-    var workPeriods: [DailySchedulePeriod]
+public struct DailySchedule: Codable, Equatable {
+    public var sleepPeriods: [DailySchedulePeriod]
+    public var workPeriods: [DailySchedulePeriod]
 
-    init(
+    public init(
         sleepPeriods: [DailySchedulePeriod],
         workPeriods: [DailySchedulePeriod]
     ) {
@@ -37,7 +37,7 @@ struct DailySchedule: Codable, Equatable {
     }
 
     // This initializer keeps callers and saved data from the first version compatible.
-    init(
+    public init(
         sleepStart: DateComponents,
         sleepEnd: DateComponents,
         workStart: DateComponents,
@@ -68,7 +68,7 @@ struct DailySchedule: Codable, Equatable {
         case workdays
     }
 
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         if let savedSleepPeriods = try container.decodeIfPresent(
@@ -101,7 +101,7 @@ struct DailySchedule: Codable, Equatable {
         )
     }
 
-    func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(sleepPeriods, forKey: .sleepPeriods)
         try container.encode(workPeriods, forKey: .workPeriods)
@@ -110,27 +110,27 @@ struct DailySchedule: Codable, Equatable {
 
 extension DailySchedule {
     // Legacy accessors remain useful to older callers while the UI moves to period lists.
-    var sleepStart: DateComponents {
+    public var sleepStart: DateComponents {
         sleepPeriods.first?.start ?? DateComponents(hour: 23)
     }
 
-    var sleepEnd: DateComponents {
+    public var sleepEnd: DateComponents {
         sleepPeriods.first?.end ?? DateComponents(hour: 7)
     }
 
-    var workStart: DateComponents {
+    public var workStart: DateComponents {
         workPeriods.first?.start ?? DateComponents(hour: 9)
     }
 
-    var workEnd: DateComponents {
+    public var workEnd: DateComponents {
         workPeriods.first?.end ?? DateComponents(hour: 18)
     }
 
-    var workdays: Set<Weekday> {
+    public var workdays: Set<Weekday> {
         Set(workPeriods.flatMap(\.days))
     }
 
-    func periods(for mode: DailyMode, on date: Date, calendar: Calendar = .current)
+    public func periods(for mode: DailyMode, on date: Date, calendar: Calendar = .current)
         -> [DailySchedulePeriod]
     {
         let weekday = Weekday(rawValue: calendar.component(.weekday, from: date))
@@ -153,7 +153,7 @@ extension DailySchedule {
             }
     }
 
-    func nextSleepStart(
+    public func nextSleepStart(
         after date: Date,
         calendar: Calendar = .current
     ) -> Date? {

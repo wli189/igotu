@@ -5,14 +5,14 @@
 
 import Foundation
 
-struct DailyModeProgressCalculator {
+public struct DailyModeProgressCalculator {
     private let timeline: DailyScheduleTimeline
 
-    init(calendar: Calendar = .current) {
+    public init(calendar: Calendar = .current) {
         timeline = DailyScheduleTimeline(calendar: calendar)
     }
 
-    func progress(
+    public func progress(
         for mode: DailyMode,
         schedule: DailySchedule,
         at date: Date

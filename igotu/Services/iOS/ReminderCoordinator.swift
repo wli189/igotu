@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import IgotuCore
 
 @MainActor
 final class ReminderCoordinator: ObservableObject {

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import IgotuCore
 
 struct ReminderSettingsView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore
