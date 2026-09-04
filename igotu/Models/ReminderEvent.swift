@@ -1,5 +1,17 @@
 import Foundation
 
+struct ReminderTestTiming: Codable, Equatable {
+    let notificationDelay: TimeInterval
+    let expirationGracePeriod: TimeInterval
+    let repeatDelay: TimeInterval
+
+    static let defaultValue = ReminderTestTiming(
+        notificationDelay: ReminderTiming.testNotificationDelay,
+        expirationGracePeriod: ReminderTiming.testExpirationGracePeriod,
+        repeatDelay: ReminderTiming.testRepeatDelay
+    )
+}
+
 enum ReminderEventStatus: String, Codable {
     case scheduled
     case delivered
@@ -36,6 +48,7 @@ struct ReminderEvent: Identifiable, Codable, Equatable {
     let behavior: Behavior
     let context: ReminderContext
     let isTest: Bool
+    let testTiming: ReminderTestTiming?
     var timestamp: Date
     var status: ReminderEventStatus
     var resolvedAt: Date?
@@ -46,6 +59,7 @@ struct ReminderEvent: Identifiable, Codable, Equatable {
         context: ReminderContext,
         timestamp: Date,
         isTest: Bool = false,
+        testTiming: ReminderTestTiming? = nil,
         status: ReminderEventStatus = .delivered,
         resolvedAt: Date? = nil
     ) {
@@ -53,13 +67,14 @@ struct ReminderEvent: Identifiable, Codable, Equatable {
         self.behavior = behavior
         self.context = context
         self.isTest = isTest
+        self.testTiming = testTiming
         self.timestamp = timestamp
         self.status = status
         self.resolvedAt = resolvedAt
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, behavior, context, isTest, timestamp, status, resolvedAt
+        case id, behavior, context, isTest, testTiming, timestamp, status, resolvedAt
     }
 
     init(from decoder: Decoder) throws {
@@ -68,6 +83,10 @@ struct ReminderEvent: Identifiable, Codable, Equatable {
         behavior = try container.decode(Behavior.self, forKey: .behavior)
         context = try container.decode(ReminderContext.self, forKey: .context)
         isTest = try container.decodeIfPresent(Bool.self, forKey: .isTest) ?? false
+        testTiming = try container.decodeIfPresent(
+            ReminderTestTiming.self,
+            forKey: .testTiming
+        )
         timestamp = try container.decode(Date.self, forKey: .timestamp)
         status = try container.decode(ReminderEventStatus.self, forKey: .status)
         resolvedAt = try container.decodeIfPresent(Date.self, forKey: .resolvedAt)

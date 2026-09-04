@@ -113,8 +113,12 @@ final class NotificationScheduler: NSObject, @preconcurrency UNUserNotificationC
         try await center.add(request)
     }
 
-    func scheduleTestSleepReminder(after delay: TimeInterval = 60) async throws {
-        let fireDate = Date.now.addingTimeInterval(max(1, delay))
+    func scheduleTestSleepReminder(
+        after delay: TimeInterval? = nil
+    ) async throws {
+        let fireDate = Date.now.addingTimeInterval(
+            max(1, delay ?? ReminderTiming.testNotificationDelay)
+        )
         let content = UNMutableNotificationContent()
         content.title = "Test: Wind Down"
         content.body = "Temporary test sleep reminder."

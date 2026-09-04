@@ -125,12 +125,19 @@ final class ReminderCoordinator: ObservableObject {
     }
 
     @discardableResult
-    func scheduleTestNotification(for behavior: Behavior) async -> Bool {
+    func scheduleTestNotification(
+        for behavior: Behavior,
+        timing requestedTiming: ReminderTestTiming? = nil,
+        after delay: TimeInterval? = nil
+    ) async -> Bool {
         guard await notificationScheduler.requestPermissionIfNeeded() else {
             return false
         }
 
-        let fireDate = Date.now.addingTimeInterval(60)
+        let timing = requestedTiming ?? .defaultValue
+        let fireDate = Date.now.addingTimeInterval(
+            max(1, delay ?? timing.notificationDelay)
+        )
         let mode = DailyModeManager().currentMode(
             for: configuration.schedule,
             at: fireDate
@@ -139,7 +146,8 @@ final class ReminderCoordinator: ObservableObject {
             behavior: behavior,
             context: context(for: mode),
             dueAt: fireDate,
-            isTest: true
+            isTest: true,
+            testTiming: timing
         )
 
         do {
@@ -152,13 +160,15 @@ final class ReminderCoordinator: ObservableObject {
     }
 
     @discardableResult
-    func scheduleTestSleepReminder() async -> Bool {
+    func scheduleTestSleepReminder(
+        after delay: TimeInterval? = nil
+    ) async -> Bool {
         guard await notificationScheduler.requestPermissionIfNeeded() else {
             return false
         }
 
         do {
-            try await notificationScheduler.scheduleTestSleepReminder()
+            try await notificationScheduler.scheduleTestSleepReminder(after: delay)
             return true
         } catch {
             return false
@@ -193,10 +203,21 @@ final class ReminderCoordinator: ObservableObject {
         _ = await notificationScheduler.requestPermissionIfNeeded()
 
         let now = Date.now
-        let expiredEvents = history.expireScheduledEvents(
+        let expiredTestEvents = history.expireScheduledEvents(
             before: now,
-            gracePeriod: ReminderTiming.expirationGracePeriod
+            gracePeriod: ReminderTiming.testExpirationGracePeriod,
+            isTest: true,
+            gracePeriodForEvent: {
+                $0.testTiming?.expirationGracePeriod
+                    ?? ReminderTiming.testExpirationGracePeriod
+            }
         )
+        let expiredProductionEvents = history.expireScheduledEvents(
+            before: now,
+            gracePeriod: ReminderTiming.expirationGracePeriod,
+            isTest: false
+        )
+        let expiredEvents = expiredTestEvents + expiredProductionEvents
         let realExpiredEvents = expiredEvents.filter { !$0.isTest }
 
         var rollingFrom = request.rollingFrom
@@ -211,6 +232,17 @@ final class ReminderCoordinator: ObservableObject {
                expiredEventIDs.contains(fullScreenReminder.id)
             {
                 self.fullScreenReminder = nil
+            }
+        }
+
+        for event in expiredTestEvents {
+            Task { [weak self] in
+                _ = await self?.scheduleTestNotification(
+                    for: event.behavior,
+                    timing: event.testTiming ?? .defaultValue,
+                    after: event.testTiming?.repeatDelay
+                        ?? ReminderTiming.testRepeatDelay
+                )
             }
         }
 
@@ -320,9 +352,7 @@ final class ReminderCoordinator: ObservableObject {
                 return
             }
 
-            let expirationDate = event.timestamp.addingTimeInterval(
-                ReminderTiming.expirationGracePeriod
-            )
+            let expirationDate = expirationDate(for: event)
             if event.status == .expired ||
                 (!event.status.isTerminal && expirationDate <= date)
             {
@@ -334,9 +364,20 @@ final class ReminderCoordinator: ObservableObject {
                 removePrompt(for: eventID)
                 showExpiredReminderToast()
 
-                if didExpireOnOpen && !event.isTest {
-                    Task { [weak self] in
-                        await self?.refresh()
+                if didExpireOnOpen {
+                    if event.isTest {
+                        Task { [weak self] in
+                            _ = await self?.scheduleTestNotification(
+                                for: event.behavior,
+                                timing: event.testTiming ?? .defaultValue,
+                                after: event.testTiming?.repeatDelay
+                                    ?? ReminderTiming.testRepeatDelay
+                            )
+                        }
+                    } else {
+                        Task { [weak self] in
+                            await self?.refresh()
+                        }
                     }
                 }
                 return
@@ -351,6 +392,9 @@ final class ReminderCoordinator: ObservableObject {
             cancelToastExpiration(for: eventID)
             toastReminders.removeAll { $0.id == eventID }
             fullScreenReminder = history.event(for: eventID)
+            if let event = fullScreenReminder {
+                scheduleToastExpiration(for: event)
+            }
         case let .acknowledged(eventID, date):
             guard let event = history.event(for: eventID),
                   history.updateStatus(
@@ -380,7 +424,17 @@ final class ReminderCoordinator: ObservableObject {
                 return
             }
             removePrompt(for: eventID)
-            guard !event.isTest else { return }
+            if event.isTest {
+                Task { [weak self] in
+                    _ = await self?.scheduleTestNotification(
+                        for: event.behavior,
+                        timing: event.testTiming ?? .defaultValue,
+                        after: event.testTiming?.repeatDelay
+                            ?? ReminderTiming.testRepeatDelay
+                    )
+                }
+                return
+            }
             let compensationDate = date.addingTimeInterval(
                 ReminderTiming.compensationDelay
             )
@@ -437,9 +491,7 @@ final class ReminderCoordinator: ObservableObject {
     private func scheduleToastExpiration(for event: ReminderEvent) {
         cancelToastExpiration(for: event.id)
 
-        let expirationDate = event.timestamp.addingTimeInterval(
-            ReminderTiming.expirationGracePeriod
-        )
+        let expirationDate = expirationDate(for: event)
         let delay = max(0, expirationDate.timeIntervalSinceNow)
 
         toastExpirationTasks[event.id] = Task { @MainActor [weak self] in
@@ -463,6 +515,14 @@ final class ReminderCoordinator: ObservableObject {
         for eventID in eventIDs {
             cancelToastExpiration(for: eventID)
         }
+    }
+
+    private func expirationDate(for event: ReminderEvent) -> Date {
+        let gracePeriod = event.isTest
+            ? event.testTiming?.expirationGracePeriod
+                ?? ReminderTiming.testExpirationGracePeriod
+            : ReminderTiming.expirationGracePeriod
+        return event.timestamp.addingTimeInterval(gracePeriod)
     }
 
     private func showExpiredReminderToast() {

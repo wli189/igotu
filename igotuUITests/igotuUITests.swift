@@ -34,9 +34,12 @@ final class igotuUITests: XCTestCase {
         reminderTests.tap()
 
         XCTAssertTrue(app.navigationBars["Testing"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Drink Water in 1 minute"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.buttons["Stand Up in 1 minute"].exists)
-        XCTAssertTrue(app.buttons["Move Around in 1 minute"].exists)
-        XCTAssertTrue(app.buttons["Wind Down in 1 minute"].exists)
+        XCTAssertTrue(app.steppers["Test first alert delay"].exists)
+        XCTAssertTrue(app.steppers["Test visible duration"].exists)
+        XCTAssertTrue(app.steppers["Test repeat delay"].exists)
+        XCTAssertTrue(app.buttons["Schedule Drink Water test"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Schedule Stand Up test"].exists)
+        XCTAssertTrue(app.buttons["Schedule Move Around test"].exists)
+        XCTAssertTrue(app.buttons["Schedule Wind Down test"].exists)
     }
 }

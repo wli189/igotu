@@ -7,6 +7,12 @@ struct NotificationTestView: View {
     @State private var isWorking = false
     @State private var statusMessage: String?
     @State private var testNotifications: [ScheduledTestNotification] = []
+    @AppStorage("notificationTest.delaySeconds")
+    private var delaySeconds = Int(ReminderTiming.testNotificationDelay)
+    @AppStorage("notificationTest.expirationSeconds")
+    private var expirationSeconds = Int(ReminderTiming.testExpirationGracePeriod)
+    @AppStorage("notificationTest.repeatSeconds")
+    private var repeatSeconds = Int(ReminderTiming.testRepeatDelay)
 
     private let refreshTimer = Timer.publish(
         every: 5,
@@ -14,29 +20,58 @@ struct NotificationTestView: View {
         in: .common
     ).autoconnect()
 
+    private var testTiming: ReminderTestTiming {
+        ReminderTestTiming(
+            notificationDelay: TimeInterval(delaySeconds),
+            expirationGracePeriod: TimeInterval(expirationSeconds),
+            repeatDelay: TimeInterval(repeatSeconds)
+        )
+    }
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             Form {
+                Section("Timing") {
+                    Stepper(
+                        "First alert: \(delaySeconds)s",
+                        value: $delaySeconds,
+                        in: 1 ... 120
+                    )
+                    .accessibilityIdentifier("Test first alert delay")
+                    Stepper(
+                        "Visible duration: \(expirationSeconds)s",
+                        value: $expirationSeconds,
+                        in: 1 ... 300
+                    )
+                    .accessibilityIdentifier("Test visible duration")
+                    Stepper(
+                        "Repeat delay: \(repeatSeconds)s",
+                        value: $repeatSeconds,
+                        in: 1 ... 300
+                    )
+                    .accessibilityIdentifier("Test repeat delay")
+                }
+
                 Section("Temporary notification") {
                     ForEach(Behavior.allCases) { behavior in
                         Button {
                             scheduleTestNotification(for: behavior)
                         } label: {
                             Label(
-                                "\(behavior.title) in 1 minute",
+                                behavior.title,
                                 systemImage: behavior.icon
                             )
                         }
-                        .accessibilityIdentifier("\(behavior.title) in 1 minute")
+                        .accessibilityIdentifier("Schedule \(behavior.title) test")
                         .disabled(isWorking)
                     }
 
                     Button {
                         scheduleTestSleepReminder()
                     } label: {
-                        Label("Wind Down in 1 minute", systemImage: "moon.zzz.fill")
+                        Label("Wind Down", systemImage: "moon.zzz.fill")
                     }
-                    .accessibilityIdentifier("Wind Down in 1 minute")
+                    .accessibilityIdentifier("Schedule Wind Down test")
                     .disabled(isWorking)
 
                     Button(role: .destructive) {
@@ -97,7 +132,8 @@ struct NotificationTestView: View {
 
         Task {
             let didSchedule = await reminderCoordinator.scheduleTestNotification(
-                for: behavior
+                for: behavior,
+                timing: testTiming
             )
             isWorking = false
             statusMessage = didSchedule
@@ -123,7 +159,9 @@ struct NotificationTestView: View {
         statusMessage = nil
 
         Task {
-            let didSchedule = await reminderCoordinator.scheduleTestSleepReminder()
+            let didSchedule = await reminderCoordinator.scheduleTestSleepReminder(
+                after: testTiming.notificationDelay
+            )
             isWorking = false
             statusMessage = didSchedule
                 ? "Test notification scheduled."

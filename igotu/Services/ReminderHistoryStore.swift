@@ -49,6 +49,7 @@ final class ReminderHistoryStore: ObservableObject {
         context: ReminderContext,
         dueAt: Date,
         isTest: Bool = false,
+        testTiming: ReminderTestTiming? = nil,
         now: Date = .now
     ) -> ReminderEvent {
         let event = ReminderEvent(
@@ -56,6 +57,7 @@ final class ReminderHistoryStore: ObservableObject {
             context: context,
             timestamp: dueAt,
             isTest: isTest,
+            testTiming: testTiming,
             status: .scheduled
         )
         append(event, now: now)
@@ -94,16 +96,23 @@ final class ReminderHistoryStore: ObservableObject {
     @discardableResult
     func expireScheduledEvents(
         before date: Date = .now,
-        gracePeriod: TimeInterval = 0
+        gracePeriod: TimeInterval = 0,
+        isTest: Bool? = nil,
+        gracePeriodForEvent: ((ReminderEvent) -> TimeInterval)? = nil
     ) -> [ReminderEvent] {
         var events = currentEvents(now: date)
         var didChange = false
         var expiredEvents: [ReminderEvent] = []
 
         for index in events.indices where
-            events[index].status == .scheduled || events[index].status == .delivered
+            (events[index].status == .scheduled || events[index].status == .delivered)
         {
-            let expirationDate = events[index].timestamp.addingTimeInterval(gracePeriod)
+            if let isTest, events[index].isTest != isTest { continue }
+
+            let eventGracePeriod = gracePeriodForEvent?(events[index]) ?? gracePeriod
+            let expirationDate = events[index].timestamp.addingTimeInterval(
+                eventGracePeriod
+            )
             guard expirationDate <= date else { continue }
 
             events[index].status = .expired

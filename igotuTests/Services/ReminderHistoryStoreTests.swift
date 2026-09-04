@@ -236,4 +236,39 @@ struct ReminderHistoryStoreTests {
 
         #expect(store.status(for: event.id) == .expired)
     }
+
+    @Test func testEventsCanUseShortExpirationGracePeriod() {
+        let suiteName = "ReminderHistoryTestExpirationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = ReminderHistoryStore(defaults: defaults)
+        let now = Date()
+        let timing = ReminderTestTiming(
+            notificationDelay: 7,
+            expirationGracePeriod: 12,
+            repeatDelay: 9
+        )
+        let event = store.recordScheduled(
+            behavior: .hydration,
+            context: .work,
+            dueAt: now,
+            isTest: true,
+            testTiming: timing,
+            now: now
+        )
+
+        store.expireScheduledEvents(
+            before: now.addingTimeInterval(timing.expirationGracePeriod),
+            gracePeriod: ReminderTiming.testExpirationGracePeriod,
+            isTest: true,
+            gracePeriodForEvent: {
+                $0.testTiming?.expirationGracePeriod
+                    ?? ReminderTiming.testExpirationGracePeriod
+            }
+        )
+
+        #expect(store.status(for: event.id) == .expired)
+        #expect(store.event(for: event.id)?.testTiming == timing)
+    }
 }
