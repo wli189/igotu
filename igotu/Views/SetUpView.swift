@@ -151,10 +151,11 @@ struct SetUpView: View {
                 },
                 onDelete: editor.period.map { period in
                     { delete(period, from: editor.mode) }
-                }
+                },
+                sleepReminderLeadMinutes: editor.mode == .sleeping
+                    ? $sleepReminderLeadMinutes
+                    : nil
             )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
         }
     }
 
@@ -186,10 +187,6 @@ struct SetUpView: View {
                         accent: accent
                     )
 
-                    if !sleepPeriods.isEmpty {
-                        sleepReminderContent()
-                    }
-
                     Divider()
                         .padding(.leading, 44)
 
@@ -205,67 +202,6 @@ struct SetUpView: View {
                 .padding(.vertical, 8)
             }
         }
-    }
-
-    private func sleepReminderContent() -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Text("Wind down")
-
-                Spacer(minLength: 8)
-
-                Button {
-                    adjustSleepReminderLeadTime(by: -1)
-                } label: {
-                    Image(systemName: "minus")
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(.borderless)
-                .background(.quaternary, in: Circle())
-                .accessibilityLabel("Decrease wind down reminder")
-                .disabled(sleepReminderLeadMinutes <= minimumSleepReminderLeadMinutes)
-
-                Text("\(sleepReminderLeadMinutes) min")
-                    .font(.subheadline.weight(.semibold))
-                    .monospacedDigit()
-                    .frame(minWidth: 58)
-                    .multilineTextAlignment(.center)
-
-                Button {
-                    adjustSleepReminderLeadTime(by: 1)
-                } label: {
-                    Image(systemName: "plus")
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(.borderless)
-                .background(.quaternary, in: Circle())
-                .accessibilityLabel("Increase wind down reminder")
-                .disabled(sleepReminderLeadMinutes >= maximumSleepReminderLeadMinutes)
-            }
-        }
-        .padding(.vertical, 12)
-    }
-
-    private var minimumSleepReminderLeadMinutes: Int {
-        Int(ReminderTiming.minimumSleepReminderLeadTime / 60)
-    }
-
-    private var maximumSleepReminderLeadMinutes: Int {
-        Int(ReminderTiming.maximumSleepReminderLeadTime / 60)
-    }
-
-    private var sleepReminderLeadTimeStepMinutes: Int {
-        Int(ReminderTiming.sleepReminderLeadTimeStep / 60)
-    }
-
-    private func adjustSleepReminderLeadTime(by direction: Int) {
-        sleepReminderLeadMinutes = min(
-            max(
-                sleepReminderLeadMinutes + direction * sleepReminderLeadTimeStepMinutes,
-                minimumSleepReminderLeadMinutes
-            ),
-            maximumSleepReminderLeadMinutes
-        )
     }
 
     private func schedulePeriodsContent(
@@ -301,17 +237,19 @@ struct SetUpView: View {
                 }
             }
 
-            Button {
-                editorConfiguration = SchedulePeriodEditorConfiguration(
-                    mode: mode,
-                    period: nil
-                )
-            } label: {
-                Label("Add time period", systemImage: "plus.circle.fill")
-                    .font(.subheadline.weight(.semibold))
+            if mode != .sleeping || periods.isEmpty {
+                Button {
+                    editorConfiguration = SchedulePeriodEditorConfiguration(
+                        mode: mode,
+                        period: nil
+                    )
+                } label: {
+                    Label("Add time period", systemImage: "plus.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.borderless)
+                .padding(.top, 10)
             }
-            .buttonStyle(.borderless)
-            .padding(.top, 10)
         }
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)

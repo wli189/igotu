@@ -7,10 +7,12 @@ struct SchedulePeriodEditorView: View {
     let initialPeriod: DailySchedulePeriod?
     let onSave: (DailySchedulePeriod) -> String?
     let onDelete: (() -> Void)?
+    let sleepReminderLeadMinutes: Binding<Int>?
 
     @State private var start: Date
     @State private var end: Date
     @State private var days: Set<Weekday>
+    @State private var selectedDetent: PresentationDetent = .medium
     @State private var expandedTimePicker: TimePicker?
     @State private var errorMessage: String?
     @State private var showsDeleteConfirmation = false
@@ -18,6 +20,7 @@ struct SchedulePeriodEditorView: View {
     private enum TimePicker: Equatable {
         case start
         case end
+        case windDown
     }
 
     private var accent: Color {
@@ -28,12 +31,14 @@ struct SchedulePeriodEditorView: View {
         mode: DailyMode,
         period: DailySchedulePeriod?,
         onSave: @escaping (DailySchedulePeriod) -> String?,
-        onDelete: (() -> Void)? = nil
+        onDelete: (() -> Void)? = nil,
+        sleepReminderLeadMinutes: Binding<Int>? = nil
     ) {
         self.mode = mode
         initialPeriod = period
         self.onSave = onSave
         self.onDelete = onDelete
+        self.sleepReminderLeadMinutes = sleepReminderLeadMinutes
 
         let defaultStart = mode == .sleeping ? 23 : 9
         let defaultEnd = mode == .sleeping ? 7 : 18
@@ -108,6 +113,8 @@ struct SchedulePeriodEditorView: View {
             }
         }
         .tint(accent)
+        .presentationDetents([.medium, .large], selection: $selectedDetent)
+        .presentationDragIndicator(.visible)
     }
 
     private var editorSurface: some View {
@@ -128,6 +135,13 @@ struct SchedulePeriodEditorView: View {
                 picker: .end
             )
 
+            if let sleepReminderLeadMinutes {
+                Divider()
+                    .padding(.top, 16)
+
+                sleepReminderContent(minutes: sleepReminderLeadMinutes)
+            }
+
             Divider()
                 .padding(.vertical, 16)
 
@@ -145,6 +159,57 @@ struct SchedulePeriodEditorView: View {
         .ambientSurface(cornerRadius: 24)
     }
 
+    private func sleepReminderContent(minutes: Binding<Int>) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                togglePicker(.windDown)
+            } label: {
+                HStack {
+                    Text("Wind down")
+
+                    Spacer()
+
+                    HStack(spacing: 8) {
+                        Text("\(minutes.wrappedValue) min")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(minHeight: 44)
+            }
+
+            if expandedTimePicker == .windDown {
+                Picker("Wind down", selection: minutes) {
+                    ForEach(sleepReminderLeadMinuteOptions, id: \.self) { option in
+                        Text("\(option) min")
+                            .tag(option)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .labelsHidden()
+                .frame(maxWidth: .infinity)
+                .frame(height: 180)
+                .clipped()
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, 12)
+    }
+
+    private var sleepReminderLeadMinuteOptions: [Int] {
+        Array(
+            stride(
+                from: Int(ReminderTiming.minimumSleepReminderLeadTime / 60),
+                through: Int(ReminderTiming.maximumSleepReminderLeadTime / 60),
+                by: Int(ReminderTiming.sleepReminderLeadTimeStep / 60)
+            )
+        )
+    }
+
     private func timePickerRow(
         title: String,
         selection: Binding<Date>,
@@ -152,9 +217,7 @@ struct SchedulePeriodEditorView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    expandedTimePicker = expandedTimePicker == picker ? nil : picker
-                }
+                togglePicker(picker)
             } label: {
                 HStack {
                     Text(title)
@@ -188,6 +251,17 @@ struct SchedulePeriodEditorView: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func togglePicker(_ picker: TimePicker) {
+        withAnimation(.easeInOut(duration: 0.22)) {
+            if expandedTimePicker == picker {
+                expandedTimePicker = nil
+            } else {
+                selectedDetent = .large
+                expandedTimePicker = picker
+            }
+        }
     }
 
     private func dayButton(for weekday: Weekday) -> some View {
