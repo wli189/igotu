@@ -5,6 +5,8 @@ struct SchedulePeriodEditorView: View {
 
     let mode: DailyMode
     let initialPeriod: DailySchedulePeriod?
+    let isRegularWidth: Bool
+    private let iPadPreferredHeight: CGFloat
     let onSave: (DailySchedulePeriod) -> String?
     let onDelete: (() -> Void)?
     let sleepReminderLeadMinutes: Binding<Int>?
@@ -12,7 +14,8 @@ struct SchedulePeriodEditorView: View {
     @State private var start: Date
     @State private var end: Date
     @State private var days: Set<Weekday>
-    @State private var selectedDetent: PresentationDetent = .medium
+    @State private var selectedDetent: PresentationDetent = .large
+    @State private var iPadSelectedDetent: PresentationDetent
     @State private var expandedTimePicker: TimePicker?
     @State private var errorMessage: String?
     @State private var showsDeleteConfirmation = false
@@ -30,15 +33,21 @@ struct SchedulePeriodEditorView: View {
     init(
         mode: DailyMode,
         period: DailySchedulePeriod?,
+        isRegularWidth: Bool = false,
         onSave: @escaping (DailySchedulePeriod) -> String?,
         onDelete: (() -> Void)? = nil,
         sleepReminderLeadMinutes: Binding<Int>? = nil
     ) {
         self.mode = mode
         initialPeriod = period
+        self.isRegularWidth = isRegularWidth
         self.onSave = onSave
         self.onDelete = onDelete
         self.sleepReminderLeadMinutes = sleepReminderLeadMinutes
+
+        let iPadHeight: CGFloat = sleepReminderLeadMinutes == nil ? 420 : 560
+        iPadPreferredHeight = iPadHeight
+        _iPadSelectedDetent = State(initialValue: .height(iPadHeight))
 
         let defaultStart = mode == .sleeping ? 23 : 9
         let defaultEnd = mode == .sleeping ? 7 : 18
@@ -113,8 +122,12 @@ struct SchedulePeriodEditorView: View {
             }
         }
         .tint(accent)
-        .presentationDetents([.medium, .large], selection: $selectedDetent)
-        .presentationDragIndicator(.visible)
+        .modifier(ScheduleEditorPresentationModifier(
+            isRegularWidth: isRegularWidth,
+            selectedDetent: $selectedDetent,
+            iPadSelectedDetent: $iPadSelectedDetent,
+            iPadPreferredHeight: iPadPreferredHeight
+        ))
     }
 
     private var editorSurface: some View {
@@ -258,7 +271,11 @@ struct SchedulePeriodEditorView: View {
             if expandedTimePicker == picker {
                 expandedTimePicker = nil
             } else {
-                selectedDetent = .large
+                if isRegularWidth {
+                    iPadSelectedDetent = .large
+                } else {
+                    selectedDetent = .large
+                }
                 expandedTimePicker = picker
             }
         }
@@ -332,5 +349,29 @@ struct SchedulePeriodEditorView: View {
                 minute: components.minute
             )
         ) ?? .now
+    }
+}
+
+private struct ScheduleEditorPresentationModifier: ViewModifier {
+    let isRegularWidth: Bool
+    @Binding var selectedDetent: PresentationDetent
+    @Binding var iPadSelectedDetent: PresentationDetent
+    let iPadPreferredHeight: CGFloat
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isRegularWidth {
+            content
+                .presentationDetents(
+                    [.height(iPadPreferredHeight), .large],
+                    selection: $iPadSelectedDetent
+                )
+                .presentationSizing(.form)
+                .presentationDragIndicator(.visible)
+        } else {
+            content
+                .presentationDetents([.medium, .large], selection: $selectedDetent)
+                .presentationDragIndicator(.visible)
+        }
     }
 }

@@ -22,6 +22,7 @@ private struct SchedulePeriodEditorConfiguration: Identifiable {
 struct SetUpView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     let isEditing: Bool
     private let themeColorService = ThemeColorService()
@@ -102,6 +103,8 @@ struct SetUpView: View {
                 reminderSection(accent: accent)
                 dailyGoalsSection(accent: accent)
             }
+            .frame(maxWidth: 760, alignment: .leading)
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 20)
             .padding(.top, isEditing ? 16 : 20)
             .padding(.bottom, isEditing ? 24 : 96)
@@ -146,6 +149,7 @@ struct SetUpView: View {
             SchedulePeriodEditorView(
                 mode: editor.mode,
                 period: editor.period,
+                isRegularWidth: horizontalSizeClass == .regular,
                 onSave: { period in
                     save(period, for: editor.mode)
                 },

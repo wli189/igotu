@@ -9,6 +9,7 @@ import Combine
 struct MainTabView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore
     @EnvironmentObject private var reminderCoordinator: ReminderCoordinator
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private enum Tab: Hashable {
         case today
@@ -16,6 +17,7 @@ struct MainTabView: View {
     }
 
     @State private var selection: Tab = .today
+    @State private var iPadSelection: Tab? = .today
     @State private var activeTheme: WellnessTheme?
     private let themeColorService = ThemeColorService()
     private let themeRefreshTimer = Timer.publish(
@@ -28,21 +30,12 @@ struct MainTabView: View {
         let theme = activeTheme ?? themeColorService.currentTheme(for: configuration.schedule)
         let accent = themeColorService.color(for: theme)
 
-        TabView(selection: $selection) {
-            TodayView()
-                .tabItem {
-                    Label("Today", systemImage: "sun.max.fill")
-                }
-                .tag(Tab.today)
-
-            NavigationStack {
-                SetUpView(isEditing: true)
+        Group {
+            if horizontalSizeClass == .regular {
+                iPadNavigation(accent: accent)
+            } else {
+                phoneNavigation(accent: accent)
             }
-            .tint(accent)
-            .tabItem {
-                Label("Settings", systemImage: "slider.horizontal.3")
-            }
-            .tag(Tab.settings)
         }
         .tint(accent)
         .onAppear {
@@ -94,6 +87,53 @@ struct MainTabView: View {
                 Color.clear
             }
         }
+    }
+
+    private func phoneNavigation(accent: Color) -> some View {
+        TabView(selection: $selection) {
+            TodayView()
+                .tabItem {
+                    Label("Today", systemImage: "sun.max.fill")
+                }
+                .tag(Tab.today)
+
+            NavigationStack {
+                SetUpView(isEditing: true)
+            }
+            .tint(accent)
+            .tabItem {
+                Label("Settings", systemImage: "slider.horizontal.3")
+            }
+            .tag(Tab.settings)
+        }
+    }
+
+    private func iPadNavigation(accent: Color) -> some View {
+        NavigationSplitView {
+            List(selection: $iPadSelection) {
+                Section {
+                    Label("Today", systemImage: "sun.max.fill")
+                        .tag(Tab.today)
+
+                    Label("Settings", systemImage: "slider.horizontal.3")
+                        .tag(Tab.settings)
+                }
+            }
+            .navigationTitle("igotu")
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 210, ideal: 240, max: 300)
+        } detail: {
+            switch iPadSelection ?? .today {
+            case .today:
+                TodayView()
+            case .settings:
+                NavigationStack {
+                    SetUpView(isEditing: true)
+                }
+                .tint(accent)
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
     }
 
     private func refreshTheme() {
