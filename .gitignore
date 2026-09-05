@@ -1,0 +1,4 @@
+# Swift Package Manager and Xcode build artifacts
+.build/
+.swiftpm/
+build/
