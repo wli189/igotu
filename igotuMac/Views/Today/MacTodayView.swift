@@ -48,13 +48,6 @@ struct MacTodayView: View {
             .padding(.vertical, 30)
         }
         .background(MacAmbientBackground(accent: accent))
-        .toolbar {
-            ToolbarItem(placement: .automatic) {
-                Label("Synced locally", systemImage: "checkmark.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
     }
 
     private func color(for mode: DailyMode) -> Color {
@@ -116,17 +109,19 @@ private struct MacContextPanel: View {
                     Text("CURRENT CONTEXT")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(accent)
+                        .lineLimit(1)
                     Text(nudge)
                         .font(.title3.weight(.semibold))
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(2)
                     Text("Your reminders follow the rhythm of your schedule.")
                         .font(.callout)
                         .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(2)
                 }
                 Spacer(minLength: 12)
             }
             .padding(24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
     }
 
@@ -157,8 +152,8 @@ private struct MacNextStepPanel: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: .infinity, minHeight: 120, alignment: .topLeading)
             .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
