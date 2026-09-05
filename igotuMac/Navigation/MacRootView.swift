@@ -63,28 +63,9 @@ private struct MacSidebar: View {
                         .tag(section)
                 }
             }
-
-            Section("AT A GLANCE") {
-                Label("A calm rhythm for your day", systemImage: "leaf.fill")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .listRowSeparator(.hidden)
-            }
         }
         .listStyle(.sidebar)
         .navigationTitle("igotu")
-        .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 10) {
-                Circle().fill(accent).frame(width: 10, height: 10)
-                Text("Ambient wellness")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(.bar)
-        }
     }
 }
 
