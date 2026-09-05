@@ -58,11 +58,7 @@ struct MacTodayView: View {
     }
 
     private func color(for mode: DailyMode) -> Color {
-        switch mode {
-        case .sleeping: return MacTheme.night
-        case .work: return MacTheme.accent
-        case .idle: return MacTheme.warm
-        }
+        MacTheme.color(for: mode)
     }
 
     private func modeSubtitle(_ mode: DailyMode) -> String {

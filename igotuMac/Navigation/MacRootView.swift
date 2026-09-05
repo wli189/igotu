@@ -28,26 +28,32 @@ struct MacRootView: View {
     @State private var selection: MacSection? = .today
 
     var body: some View {
-        NavigationSplitView {
-            MacSidebar(selection: $selection)
-        } detail: {
-            Group {
-                switch selection ?? .today {
-                case .today: MacTodayView()
-                case .schedule: MacScheduleView()
-                case .reminders: MacRemindersView()
+        TimelineView(.periodic(from: .now, by: 60)) { timeline in
+            let accent = MacTheme.currentColor(for: configuration.schedule, at: timeline.date)
+
+            NavigationSplitView {
+                MacSidebar(selection: $selection, accent: accent)
+            } detail: {
+                Group {
+                    switch selection ?? .today {
+                    case .today: MacTodayView()
+                    case .schedule: MacScheduleView()
+                    case .reminders: MacRemindersView()
+                    }
                 }
+                .id(selection ?? .today)
+                .environmentObject(configuration)
             }
-            .id(selection ?? .today)
-            .environmentObject(configuration)
+            .navigationSplitViewStyle(.balanced)
+            .tint(accent)
+            .environment(\.macAccent, accent)
         }
-        .navigationSplitViewStyle(.balanced)
-        .tint(MacTheme.accent)
     }
 }
 
 private struct MacSidebar: View {
     @Binding var selection: MacSection?
+    let accent: Color
 
     var body: some View {
         List(selection: $selection) {
@@ -69,7 +75,7 @@ private struct MacSidebar: View {
         .navigationTitle("igotu")
         .safeAreaInset(edge: .bottom) {
             HStack(spacing: 10) {
-                Circle().fill(MacTheme.accent).frame(width: 10, height: 10)
+                Circle().fill(accent).frame(width: 10, height: 10)
                 Text("Ambient wellness")
                     .font(.caption)
                     .foregroundStyle(.secondary)

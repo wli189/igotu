@@ -39,6 +39,32 @@ public struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
         max(1, Int((interval / 60 / 5).rounded(.down)))
     }
 
+    public static let standardIntervals: [TimeInterval] = [
+        15, 30, 45, 60, 120, 180, 240, 300, 360
+    ].map { $0 * 60 }
+
+    public static func intervalOptions(including interval: TimeInterval) -> [TimeInterval] {
+        Array(Set(standardIntervals + [interval])).sorted()
+    }
+
+    public static func offsetTierMinutes(for interval: TimeInterval) -> [Int] {
+        let maximum = maximumOffsetMinutes(for: interval)
+        return Array(Set([
+            0,
+            Int((Double(maximum) / 3).rounded()),
+            Int((Double(maximum) * 2 / 3).rounded()),
+            maximum
+        ])).sorted()
+    }
+
+    public static func nearestOffsetMinutes(to minutes: Double, for interval: TimeInterval) -> Double {
+        offsetTierMinutes(for: interval).map(Double.init).min {
+            let leftDistance = abs($0 - minutes)
+            let rightDistance = abs($1 - minutes)
+            return leftDistance == rightDistance ? $0 < $1 : leftDistance < rightDistance
+        } ?? 0
+    }
+
     public var title: String {
         switch preset {
         case .occasional: return "Occasional"

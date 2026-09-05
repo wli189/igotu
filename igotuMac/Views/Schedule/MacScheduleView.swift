@@ -3,6 +3,7 @@ import IgotuCore
 
 struct MacScheduleView: View {
     @EnvironmentObject private var configuration: MacConfigurationStore
+    @Environment(\.macAccent) private var accent
     @State private var editorMode: DailyMode = .work
     @State private var editorPeriod: DailySchedulePeriod?
     @State private var isShowingEditor = false
@@ -55,7 +56,7 @@ struct MacScheduleView: View {
             .frame(maxWidth: .infinity, alignment: .topLeading)
             .padding(34)
         }
-        .background(MacAmbientBackground(accent: MacTheme.accent))
+        .background(MacAmbientBackground(accent: accent))
         .sheet(isPresented: $isShowingEditor) {
             MacPeriodEditor(mode: editorMode, period: editorPeriod) { period in
                 save(period: period, in: editorMode)
@@ -74,7 +75,7 @@ struct MacScheduleView: View {
                     if periods.isEmpty {
                         HStack(spacing: 14) {
                             Image(systemName: icon)
-                                .foregroundStyle(MacTheme.accent)
+                                .foregroundStyle(accent)
                             Text("No \(title.lowercased()) schedule yet")
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -106,9 +107,9 @@ struct MacScheduleView: View {
         } label: {
             HStack(spacing: 14) {
                 Image(systemName: icon)
-                    .foregroundStyle(MacTheme.accent)
+                    .foregroundStyle(accent)
                     .frame(width: 30, height: 30)
-                    .background(MacTheme.accent.opacity(0.12), in: Circle())
+                    .background(accent.opacity(0.12), in: Circle())
                 VStack(alignment: .leading, spacing: 4) {
                     Text(timeText(period.start) + " – " + timeText(period.end))
                         .font(.body.weight(.medium))
@@ -221,6 +222,7 @@ struct MacDetailHeader: View {
 
 private struct MacPeriodEditor: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.macAccent) private var accent
     let mode: DailyMode
     let period: DailySchedulePeriod?
     let onSave: (DailySchedulePeriod) -> String?
@@ -260,7 +262,7 @@ private struct MacPeriodEditor: View {
                                 if days.contains(weekday) { days.remove(weekday) } else { days.insert(weekday) }
                             }
                             .buttonStyle(.bordered)
-                            .tint(days.contains(weekday) ? MacTheme.accent : .secondary)
+                            .tint(days.contains(weekday) ? accent : .secondary)
                         }
                     }
                 }

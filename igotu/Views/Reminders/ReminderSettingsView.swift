@@ -181,8 +181,7 @@ private struct FrequencyEditorView: View {
     }
 
     private var intervalOptions: [TimeInterval] {
-        let defaults: [TimeInterval] = [15, 30, 45, 60, 120, 180, 240, 300, 360].map { $0 * 60 }
-        return Array(Set(defaults + [frequency.interval])).sorted()
+        ReminderFrequency.intervalOptions(including: frequency.interval)
     }
 
     private var offsetOptions: [OffsetOption] {
@@ -191,17 +190,8 @@ private struct FrequencyEditorView: View {
         }
     }
 
-    private var maxOffsetMinutes: Int {
-        ReminderFrequency.maximumOffsetMinutes(for: frequency.interval)
-    }
-
     private var offsetTierMinutes: [Int] {
-        Array(Set([
-            0,
-            Int((Double(maxOffsetMinutes) / 3).rounded()),
-            Int((Double(maxOffsetMinutes) * 2 / 3).rounded()),
-            maxOffsetMinutes
-        ])).sorted()
+        ReminderFrequency.offsetTierMinutes(for: frequency.interval)
     }
 
     private var intervalBinding: Binding<TimeInterval> {
@@ -269,19 +259,7 @@ private struct FrequencyEditorView: View {
         to minutes: Double,
         for interval: TimeInterval
     ) -> Double {
-        let maximum = ReminderFrequency.maximumOffsetMinutes(for: interval)
-        let tiers = Set([
-            0,
-            Int((Double(maximum) / 3).rounded()),
-            Int((Double(maximum) * 2 / 3).rounded()),
-            maximum
-        ])
-
-        return Double(tiers.min {
-            let leftDistance = abs(Double($0) - minutes)
-            let rightDistance = abs(Double($1) - minutes)
-            return leftDistance == rightDistance ? $0 < $1 : leftDistance < rightDistance
-        } ?? 0)
+        ReminderFrequency.nearestOffsetMinutes(to: minutes, for: interval)
     }
 
     private func normalizeOffsetIfNeeded() {
