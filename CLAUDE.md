@@ -65,7 +65,7 @@ Replace the simulator name/OS with a destination from `-showdestinations` when t
 - `igotu/Views/Reminders/ReminderToastView.swift` renders foreground reminder actions, while `ReminderConfirmationView.swift` renders the full-screen confirmation route opened from a notification.
 - `igotu/Services/Core/AppConfigurationStore.swift` persists configuration in `UserDefaults` and normalizes legacy or incomplete rules/goals on load. `ReminderHistoryStore` persists a bounded event history and applies cooldown, expiration, and completion rules.
 - `igotu/Resources/Assets.xcassets` contains the app icon and theme color catalogs. The Xcode project uses filesystem-synchronized groups, so Swift files added under app, extension, or test directories are picked up automatically.
-- `igotuMac/App/igotuMacApp.swift` is the temporary macOS smoke-test app. It intentionally contains only a blank window; macOS product UI and platform services are not implemented yet.
+- `igotuMac/App/` contains the macOS product UI and runtime: a NavigationSplitView workspace with Today, Schedule, and Reminders surfaces, a macOS-specific UserDefaults-backed configuration/history store, and macOS `UserNotifications` scheduling/coordinator code. It reuses `IgotuCore` models while keeping iOS notification adapters out of the macOS target.
 
 ### Test targets
 
@@ -111,12 +111,21 @@ igotu/
 └── Resources/                  # Asset catalogs and app resources
 
 igotuMac/
-└── App/                         # Temporary blank macOS smoke-test app
+├── App/                         # macOS app entry point
+├── Navigation/                  # macOS sidebar and root navigation
+├── Services/
+│   ├── Core/                    # macOS configuration and history stores
+│   └── macOS/                   # UserNotifications and reminder coordinator
+├── Views/
+│   ├── Today/                   # Today dashboard
+│   ├── Schedule/                # Schedule and goal editing
+│   └── Reminders/               # Reminder settings and confirmation UI
+└── DesignSystem/                # macOS-specific visual styles
 ```
 
 iPhone and iPadOS use the same target and the same `Services/iOS` implementation. UI differences are handled with size classes and adaptive SwiftUI layouts; do not create separate iPhone and iPad source trees. New iOS/iPadOS application code belongs under `igotu/`; platform-neutral logic belongs in `IgotuCore/`.
 
-The `igotuMac` target is currently only a buildable blank window. Future macOS adapters and UI belong under `igotuMac/`; they should consume `IgotuCore` instead of duplicating its implementation.
+The `igotuMac` target owns the desktop presentation and macOS-specific adapters. New macOS code belongs under `igotuMac/`; it should consume `IgotuCore` instead of duplicating schedule and reminder domain logic.
 
 ## Repository conventions
 
