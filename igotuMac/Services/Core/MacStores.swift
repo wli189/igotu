@@ -15,10 +15,22 @@ final class MacConfigurationStore: ObservableObject {
 
     private static let defaultSchedule = DailySchedule(sleepPeriods: [], workPeriods: [])
     private static let defaultWorkReminders = Behavior.allCases.map {
-        ReminderRule(behavior: $0, isEnabled: true, frequency: $0 == .standUp ? .frequent : .regular)
+        ReminderRule(
+            behavior: $0,
+            isEnabled: true,
+            frequency: $0 == .standUp
+                ? ReminderFrequency(interval: 30 * 60, offsetRange: -2 * 60 ... 2 * 60)
+                : ReminderFrequency(interval: 60 * 60, offsetRange: -8 * 60 ... 8 * 60)
+        )
     }
     private static let defaultIdleReminders = Behavior.allCases.map {
-        ReminderRule(behavior: $0, isEnabled: true, frequency: $0 == .movement ? .regular : .occasional)
+        ReminderRule(
+            behavior: $0,
+            isEnabled: true,
+            frequency: $0 == .movement
+                ? ReminderFrequency(interval: 60 * 60, offsetRange: -8 * 60 ... 8 * 60)
+                : ReminderFrequency(interval: 2 * 60 * 60, offsetRange: -8 * 60 ... 8 * 60)
+        )
     }
 
     @Published private(set) var schedule: DailySchedule
@@ -76,7 +88,11 @@ final class MacConfigurationStore: ObservableObject {
 
     func reminderRule(for behavior: Behavior, in context: ReminderContext) -> ReminderRule {
         let rules = context == .work ? workReminders : idleReminders
-        return rules.first { $0.behavior == behavior } ?? ReminderRule(behavior: behavior, isEnabled: false, frequency: .regular)
+        return rules.first { $0.behavior == behavior } ?? ReminderRule(
+            behavior: behavior,
+            isEnabled: false,
+            frequency: ReminderFrequency(interval: 60 * 60, offsetRange: -8 * 60 ... 8 * 60)
+        )
     }
 
     func setReminderEnabled(_ enabled: Bool, for behavior: Behavior, in context: ReminderContext) {
@@ -87,7 +103,7 @@ final class MacConfigurationStore: ObservableObject {
 
     func setReminderFrequency(_ frequency: ReminderFrequency, for behavior: Behavior, in context: ReminderContext) {
         var rule = reminderRule(for: behavior, in: context)
-        rule.frequency = frequency
+        rule.frequency = frequency.customValue
         update(rule, in: context)
     }
 
@@ -127,7 +143,11 @@ final class MacConfigurationStore: ObservableObject {
                 result[index] = rule
             }
         }
-        return result
+        return result.map { rule in
+            var customRule = rule
+            customRule.frequency = rule.frequency.customValue
+            return customRule
+        }
     }
 
     private static func loadLeadTime(from defaults: UserDefaults) -> TimeInterval {

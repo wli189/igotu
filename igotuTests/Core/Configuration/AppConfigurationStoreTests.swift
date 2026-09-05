@@ -55,6 +55,18 @@ struct AppConfigurationStoreTests {
         #expect(store.schedule.workPeriods.isEmpty)
     }
 
+    @Test func defaultReminderOffsetsAreAvailablePickerOptions() {
+        let suiteName = "DefaultReminderOffsetTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = AppConfigurationStore(defaults: defaults)
+
+        #expect(store.reminderRule(for: .hydration, in: .work).frequency.offsetRange == -8 * 60 ... 8 * 60)
+        #expect(store.reminderRule(for: .standUp, in: .work).frequency.offsetRange == -2 * 60 ... 2 * 60)
+        #expect(store.reminderRule(for: .movement, in: .work).frequency.offsetRange == -8 * 60 ... 8 * 60)
+    }
+
     @Test func restoresReminderRulesIndependentlyForWorkAndIdle() {
         let suiteName = "ReminderRulesTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
@@ -70,8 +82,10 @@ struct AppConfigurationStoreTests {
 
         #expect(!restoredStore.reminderRule(for: .hydration, in: .work).isEnabled)
         #expect(restoredStore.reminderRule(for: .hydration, in: .idle).isEnabled)
-        #expect(restoredStore.reminderRule(for: .movement, in: .idle).frequency == .frequent)
-        #expect(restoredStore.reminderRule(for: .movement, in: .work).frequency == .regular)
+        #expect(restoredStore.reminderRule(for: .movement, in: .idle).frequency.isCustom)
+        #expect(restoredStore.reminderRule(for: .movement, in: .idle).frequency.interval == ReminderFrequency.frequent.interval)
+        #expect(restoredStore.reminderRule(for: .movement, in: .work).frequency.isCustom)
+        #expect(restoredStore.reminderRule(for: .movement, in: .work).frequency.interval == ReminderFrequency.regular.interval)
     }
 
     @Test func restoresCustomFrequencySettings() {
@@ -218,12 +232,10 @@ struct AppConfigurationStoreTests {
 
         #expect(store.workReminders.map(\.behavior) == Behavior.allCases)
         #expect(store.reminderRule(for: .hydration, in: .work).isEnabled)
-        #expect(
-            store.reminderRule(for: .hydration, in: .work).frequency == .occasional
-        )
-        #expect(
-            store.reminderRule(for: .standUp, in: .work).frequency == .frequent
-        )
-        #expect(store.reminderRule(for: .movement, in: .work).isEnabled)
+        #expect(store.reminderRule(for: .hydration, in: .work).frequency.isCustom)
+        #expect(store.reminderRule(for: .hydration, in: .work).frequency.interval == ReminderFrequency.occasional.interval)
+        #expect(store.reminderRule(for: .standUp, in: .work).frequency.isCustom)
+        #expect(store.reminderRule(for: .standUp, in: .work).frequency.interval == ReminderFrequency.frequent.interval)
+        #expect(store.reminderRule(for: .movement, in: .work).frequency.isCustom)
     }
 }

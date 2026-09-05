@@ -25,15 +25,15 @@ final class AppConfigurationStore: ObservableObject {
     )
 
     private static let defaultWorkReminders = [
-        ReminderRule(behavior: .hydration, isEnabled: true, frequency: .regular),
-        ReminderRule(behavior: .standUp, isEnabled: true, frequency: .frequent),
-        ReminderRule(behavior: .movement, isEnabled: true, frequency: .regular)
+        ReminderRule(behavior: .hydration, isEnabled: true, frequency: ReminderFrequency(interval: 60 * 60, offsetRange: -8 * 60 ... 8 * 60)),
+        ReminderRule(behavior: .standUp, isEnabled: true, frequency: ReminderFrequency(interval: 30 * 60, offsetRange: -2 * 60 ... 2 * 60)),
+        ReminderRule(behavior: .movement, isEnabled: true, frequency: ReminderFrequency(interval: 60 * 60, offsetRange: -8 * 60 ... 8 * 60))
     ]
 
     private static let defaultIdleReminders = [
-        ReminderRule(behavior: .hydration, isEnabled: true, frequency: .occasional),
-        ReminderRule(behavior: .standUp, isEnabled: true, frequency: .occasional),
-        ReminderRule(behavior: .movement, isEnabled: true, frequency: .regular)
+        ReminderRule(behavior: .hydration, isEnabled: true, frequency: ReminderFrequency(interval: 2 * 60 * 60, offsetRange: -8 * 60 ... 8 * 60)),
+        ReminderRule(behavior: .standUp, isEnabled: true, frequency: ReminderFrequency(interval: 2 * 60 * 60, offsetRange: -8 * 60 ... 8 * 60)),
+        ReminderRule(behavior: .movement, isEnabled: true, frequency: ReminderFrequency(interval: 60 * 60, offsetRange: -8 * 60 ... 8 * 60))
     ]
 
     @Published private(set) var schedule: DailySchedule
@@ -106,7 +106,11 @@ final class AppConfigurationStore: ObservableObject {
         let rules = context == .work ? workReminders : idleReminders
         return rules.first { $0.behavior == behavior }
             ?? Self.defaultReminderRules(for: context).first { $0.behavior == behavior }
-            ?? ReminderRule(behavior: behavior, isEnabled: false, frequency: .regular)
+            ?? ReminderRule(
+                behavior: behavior,
+                isEnabled: false,
+                frequency: ReminderFrequency(interval: 60 * 60, offsetRange: -8 * 60 ... 8 * 60)
+            )
     }
 
     func setReminderEnabled(
@@ -125,7 +129,7 @@ final class AppConfigurationStore: ObservableObject {
         in context: ReminderContext
     ) {
         var rule = reminderRule(for: behavior, in: context)
-        rule.frequency = frequency
+        rule.frequency = frequency.customValue
         update(rule, in: context)
     }
 
@@ -191,7 +195,11 @@ final class AppConfigurationStore: ObservableObject {
             rulesByBehavior[rule.behavior] = rule
         }
 
-        return Behavior.allCases.compactMap { rulesByBehavior[$0] }
+        return Behavior.allCases.compactMap { rulesByBehavior[$0] }.map { rule in
+            var customRule = rule
+            customRule.frequency = rule.frequency.customValue
+            return customRule
+        }
     }
 
     private static func defaultReminderRules(

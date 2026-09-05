@@ -35,6 +35,10 @@ public struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
 
     public var isCustom: Bool { preset == nil }
 
+    public var customValue: ReminderFrequency {
+        ReminderFrequency(interval: interval, offsetRange: offsetRange)
+    }
+
     public static func maximumOffsetMinutes(for interval: TimeInterval) -> Int {
         max(1, Int((interval / 60 / 5).rounded(.down)))
     }
