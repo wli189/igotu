@@ -86,6 +86,38 @@ Using standard Apple System Fonts (**SF Pro / SF Pro Rounded** for numerals and 
 - Floating translucent bottom bar (`UltraThinMaterial`, `Corner Radius: 32pt`).
 - Minimal monochrome SF Symbols that subtly tint to the context accent when active.
 
+### 5.6 macOS Companion Design
+
+The macOS app should feel like the same product as iOS: it uses the same ambient light, context accents, translucent surfaces, typography hierarchy, and restrained visual weight. macOS adapts the composition for a larger window and pointer-driven workflows without introducing a separate visual language.
+
+#### Shared Visual Rules
+- Use the active context accent for labels, icons, progress, selection, and ambient lighting.
+- Use `.ultraThinMaterial` for app surfaces so the background light remains visible through cards.
+- Use a subtle white highlight stroke in light mode and a low-opacity white stroke in dark mode.
+- Use a soft shadow below surfaces (`black 6%`, blur `22pt`, y `10pt` in light mode) rather than a solid gray fill.
+- Keep continuous rounded corners, quiet typography, and generous internal spacing.
+- Preserve the same light and dark semantic colors, with system materials adapting the final appearance.
+
+#### macOS Canvas
+- Use the native window background as the base canvas with a low-opacity context gradient behind content.
+- Keep the primary content in a bounded reading column, centered in the available window.
+- Use a horizontal hero row on wide windows: the Current Context surface expands while the Next Step surface stays compact.
+- Keep the primary Today surfaces at a consistent height within the same row so the layout remains calm when text changes.
+- Use NavigationSplitView for top-level navigation and native macOS toolbar controls for status and actions.
+
+#### macOS Surface Scale
+- Hero surfaces: `28pt` corner radius, `24pt` internal padding.
+- Standard surfaces: `24pt` corner radius, `20pt` internal padding.
+- Compact metric surfaces: `18pt` corner radius, `18pt` internal padding.
+- The macOS `MacSurface` component is the platform adaptation of the iOS `.ambientSurface()` modifier; both should share material, border, shadow, and color behavior.
+
+#### macOS Typography and Controls
+- Use the same SF Pro and SF Pro Rounded hierarchy as iOS, with a `32pt` rounded greeting for the Today header.
+- Keep section labels uppercase and small, with the active context accent used sparingly.
+- Prefer native macOS controls such as segmented pickers, toggles, steppers, sheets, and toolbar items.
+- Use pointer-friendly hit areas and visible focus states while keeping controls visually quiet.
+- Do not add dense dashboard chrome, decorative cards, or platform-specific colors that are absent from the iOS experience.
+
 ---
 
 ## 6. Micro-Interactions & Haptics
@@ -127,3 +159,5 @@ struct AmbientCardStyle: ViewModifier {
     }
 }
 ```
+
+The macOS implementation should expose the same rules through `MacSurface`, with a configurable corner radius for hero, standard, and compact surfaces. Platform-specific code belongs in `igotuMac/DesignSystem/`; visual changes should update this document and the iOS/macOS surface implementations together.

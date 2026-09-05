@@ -102,7 +102,7 @@ private struct MacContextPanel: View {
     let accent: Color
 
     var body: some View {
-        MacSurface {
+        MacSurface(cornerRadius: 28) {
             HStack(spacing: 22) {
                 MacFocusDial(progress: progress, icon: mode.icon, tint: accent)
                 VStack(alignment: .leading, spacing: 8) {
@@ -139,7 +139,7 @@ private struct MacNextStepPanel: View {
     let accent: Color
 
     var body: some View {
-        MacSurface {
+        MacSurface(cornerRadius: 28) {
             VStack(alignment: .leading, spacing: 14) {
                 Label("NEXT STEP", systemImage: "sparkles")
                     .font(.caption.weight(.semibold))
@@ -192,7 +192,7 @@ private struct MacMetricPanel: View {
     }
 
     var body: some View {
-        MacSurface {
+        MacSurface(cornerRadius: 18) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: icon)
@@ -253,7 +253,7 @@ private struct MacRhythmPanel: View {
     let accent: Color
 
     var body: some View {
-        MacSurface {
+        MacSurface(cornerRadius: 24) {
             HStack(spacing: 0) {
                 rhythmColumn(title: "Sleep", icon: "moon.fill", periods: schedule.periods(for: .sleeping, on: .now))
                 Divider().frame(height: 62)

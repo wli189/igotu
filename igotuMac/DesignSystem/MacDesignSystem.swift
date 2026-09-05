@@ -55,17 +55,39 @@ struct MacAmbientBackground: View {
 
 struct MacSurface<Content: View>: View {
     let content: Content
+    let cornerRadius: CGFloat
 
-    init(@ViewBuilder content: () -> Content) {
+    @Environment(\.colorScheme) private var colorScheme
+
+    init(cornerRadius: CGFloat = 24, @ViewBuilder content: () -> Content) {
         self.content = content()
+        self.cornerRadius = cornerRadius
     }
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
         content
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(.ultraThinMaterial, in: shape)
             .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                shape
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(colorScheme == .dark ? 0.2 : 0.8),
+                                Color.white.opacity(colorScheme == .dark ? 0.03 : 0.2)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
             }
+            .shadow(
+                color: Color.black.opacity(colorScheme == .dark ? 0.28 : 0.06),
+                radius: 22,
+                x: 0,
+                y: 10
+            )
     }
 }
