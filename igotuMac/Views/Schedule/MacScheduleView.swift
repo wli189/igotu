@@ -13,8 +13,7 @@ struct MacScheduleView: View {
             VStack(alignment: .leading, spacing: 26) {
                 MacDetailHeader(title: "Schedule", subtitle: "Shape the rhythm that guides your reminders.")
 
-                scheduleSection(title: "Sleep", icon: "moon.fill", mode: .sleeping, periods: configuration.schedule.sleepPeriods)
-                scheduleSection(title: "Work", icon: "briefcase.fill", mode: .work, periods: configuration.schedule.workPeriods)
+                scheduleContent
 
                 MacSectionTitle(title: "WIND DOWN", detail: "Before your next sleep period")
                 MacSurface {
@@ -58,11 +57,39 @@ struct MacScheduleView: View {
         }
         .background(MacAmbientBackground(accent: accent))
         .sheet(isPresented: $isShowingEditor) {
-            MacPeriodEditor(mode: editorMode, period: editorPeriod) { period in
-                save(period: period, in: editorMode)
+            MacPeriodEditor(mode: editorMode, period: editorPeriod) { mode, period in
+                save(period: period, in: mode, replacing: editorMode)
             } onDelete: { period in
                 delete(period: period, from: editorMode)
                 isShowingEditor = false
+            }
+        }
+    }
+
+    private var scheduleContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("SCHEDULE")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                addButton()
+            }
+
+            if configuration.schedule.sleepPeriods.isEmpty && configuration.schedule.workPeriods.isEmpty {
+                MacSurface {
+                    Text("No schedule periods")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(20)
+                }
+            } else {
+                if !configuration.schedule.sleepPeriods.isEmpty {
+                    scheduleSection(title: "Sleep", icon: "moon.fill", mode: .sleeping, periods: configuration.schedule.sleepPeriods)
+                }
+                if !configuration.schedule.workPeriods.isEmpty {
+                    scheduleSection(title: "Work", icon: "briefcase.fill", mode: .work, periods: configuration.schedule.workPeriods)
+                }
             }
         }
     }
@@ -72,27 +99,9 @@ struct MacScheduleView: View {
             MacSectionTitle(title: title.uppercased(), detail: periods.isEmpty ? "Not set" : "\(periods.count) period\(periods.count == 1 ? "" : "s")")
             MacSurface {
                 VStack(spacing: 0) {
-                    if periods.isEmpty {
-                        HStack(spacing: 14) {
-                            Image(systemName: icon)
-                                .foregroundStyle(accent)
-                            Text("No \(title.lowercased()) schedule yet")
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            addButton(for: mode)
-                        }
-                        .padding(20)
-                    } else {
-                        ForEach(Array(periods.enumerated()), id: \.element.id) { index, period in
-                            periodRow(period, mode: mode, icon: icon)
-                            if index < periods.count - 1 { Divider().padding(.leading, 58) }
-                        }
-                        Divider().padding(.leading, 58)
-                        HStack {
-                            Spacer()
-                            addButton(for: mode)
-                        }
-                        .padding(12)
+                    ForEach(Array(periods.enumerated()), id: \.element.id) { index, period in
+                        periodRow(period, mode: mode, icon: icon)
+                        if index < periods.count - 1 { Divider().padding(.leading, 58) }
                     }
                 }
             }
@@ -129,9 +138,9 @@ struct MacScheduleView: View {
         .buttonStyle(.plain)
     }
 
-    private func addButton(for mode: DailyMode) -> some View {
+    private func addButton() -> some View {
         Button {
-            editorMode = mode
+            editorMode = .work
             editorPeriod = nil
             isShowingEditor = true
         } label: {
@@ -165,8 +174,19 @@ struct MacScheduleView: View {
         configuration.save(dailyGoals: goals)
     }
 
-    private func save(period: DailySchedulePeriod, in mode: DailyMode) -> String? {
+    private func save(
+        period: DailySchedulePeriod,
+        in mode: DailyMode,
+        replacing originalMode: DailyMode
+    ) -> String? {
         var schedule = configuration.schedule
+        if mode != originalMode {
+            if originalMode == .sleeping {
+                schedule.sleepPeriods.removeAll { $0.id == period.id }
+            } else {
+                schedule.workPeriods.removeAll { $0.id == period.id }
+            }
+        }
         if mode == .sleeping {
             replace(period, in: &schedule.sleepPeriods)
         } else {
@@ -223,20 +243,20 @@ struct MacDetailHeader: View {
 private struct MacPeriodEditor: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.macAccent) private var accent
-    let mode: DailyMode
     let period: DailySchedulePeriod?
-    let onSave: (DailySchedulePeriod) -> String?
+    let onSave: (DailyMode, DailySchedulePeriod) -> String?
     let onDelete: (DailySchedulePeriod) -> Void
+    @State private var selectedMode: DailyMode
     @State private var start: Date
     @State private var end: Date
     @State private var days: Set<Weekday>
     @State private var errorMessage: String?
 
-    init(mode: DailyMode, period: DailySchedulePeriod?, onSave: @escaping (DailySchedulePeriod) -> String?, onDelete: @escaping (DailySchedulePeriod) -> Void) {
-        self.mode = mode
+    init(mode: DailyMode, period: DailySchedulePeriod?, onSave: @escaping (DailyMode, DailySchedulePeriod) -> String?, onDelete: @escaping (DailySchedulePeriod) -> Void) {
         self.period = period
         self.onSave = onSave
         self.onDelete = onDelete
+        _selectedMode = State(initialValue: mode)
         _start = State(initialValue: Self.date(from: period?.start ?? DateComponents(hour: mode == .sleeping ? 23 : 9)))
         _end = State(initialValue: Self.date(from: period?.end ?? DateComponents(hour: mode == .sleeping ? 7 : 18)))
         _days = State(initialValue: period?.days ?? (mode == .sleeping ? Set(Weekday.allCases) : Weekday.defaultWorkdays))
@@ -245,7 +265,17 @@ private struct MacPeriodEditor: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             HStack {
-                Label(mode.title, systemImage: mode.icon).font(.title2.weight(.semibold))
+                Picker(selection: $selectedMode) {
+                    ForEach(DailyMode.scheduleModes, id: \.key) { mode in
+                        Label(mode.title, systemImage: mode.icon)
+                            .tag(mode)
+                    }
+                } label: {
+                    Label(selectedMode.title, systemImage: selectedMode.icon)
+                        .font(.title2.weight(.semibold))
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
                 Spacer()
                 Button("Cancel") { dismiss() }
                 Button("Save") { save() }.keyboardShortcut(.defaultAction)
@@ -253,8 +283,8 @@ private struct MacPeriodEditor: View {
             }
 
             Form {
-                DatePicker(mode == .sleeping ? "Bedtime" : "Starts", selection: $start, displayedComponents: .hourAndMinute)
-                DatePicker(mode == .sleeping ? "Wake up" : "Ends", selection: $end, displayedComponents: .hourAndMinute)
+                DatePicker(selectedMode == .sleeping ? "Bedtime" : "Starts", selection: $start, displayedComponents: .hourAndMinute)
+                DatePicker(selectedMode == .sleeping ? "Wake up" : "Ends", selection: $end, displayedComponents: .hourAndMinute)
                 Section("Active days") {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
                         ForEach(Weekday.mondayFirst) { weekday in
@@ -268,6 +298,10 @@ private struct MacPeriodEditor: View {
                 }
             }
             .formStyle(.grouped)
+            .onChange(of: selectedMode) { _, mode in
+                guard period == nil else { return }
+                applyDefaults(for: mode)
+            }
 
             if let period {
                 Button("Delete this period", role: .destructive) { onDelete(period) }
@@ -291,11 +325,11 @@ private struct MacPeriodEditor: View {
             return
         }
         guard start != end else {
-            errorMessage = mode == .sleeping ? "Your bedtime and wake-up time cannot be the same." : "Your work start time and end time cannot be the same."
+            errorMessage = selectedMode == .sleeping ? "Your bedtime and wake-up time cannot be the same." : "Your work start time and end time cannot be the same."
             return
         }
         let newPeriod = DailySchedulePeriod(id: period?.id ?? UUID(), start: components(from: start), end: components(from: end), days: days)
-        if let message = onSave(newPeriod) {
+        if let message = onSave(selectedMode, newPeriod) {
             errorMessage = message
         } else {
             dismiss()
@@ -309,6 +343,12 @@ private struct MacPeriodEditor: View {
     private static func date(from components: DateComponents) -> Date {
         Calendar.current.date(from: DateComponents(year: 2000, month: 1, day: 1, hour: components.hour ?? 0, minute: components.minute ?? 0)) ?? .now
     }
+
+    private func applyDefaults(for mode: DailyMode) {
+        start = Self.date(from: DateComponents(hour: mode == .sleeping ? 23 : 9))
+        end = Self.date(from: DateComponents(hour: mode == .sleeping ? 7 : 18))
+        days = mode == .sleeping ? Set(Weekday.allCases) : Weekday.defaultWorkdays
+    }
 }
 
 #Preview("Schedule") {
@@ -318,5 +358,5 @@ private struct MacPeriodEditor: View {
 }
 
 #Preview("Period Editor") {
-    MacPeriodEditor(mode: .work, period: nil, onSave: { _ in nil }, onDelete: { _ in })
+    MacPeriodEditor(mode: .work, period: nil, onSave: { _, _ in nil }, onDelete: { _ in })
 }

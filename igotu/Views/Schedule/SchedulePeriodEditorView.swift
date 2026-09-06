@@ -4,14 +4,14 @@ import IgotuCore
 struct SchedulePeriodEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
-    let mode: DailyMode
     let initialPeriod: DailySchedulePeriod?
     let isRegularWidth: Bool
     private let iPadPreferredHeight: CGFloat
-    let onSave: (DailySchedulePeriod) -> String?
+    let onSave: (DailyMode, DailySchedulePeriod) -> String?
     let onDelete: (() -> Void)?
-    let sleepReminderLeadMinutes: Binding<Int>?
+    let sleepReminderLeadMinutes: Binding<Int>
 
+    @State private var selectedMode: DailyMode
     @State private var start: Date
     @State private var end: Date
     @State private var days: Set<Weekday>
@@ -28,27 +28,27 @@ struct SchedulePeriodEditorView: View {
     }
 
     private var accent: Color {
-        ThemeColorService().color(for: mode.wellnessTheme)
+        ThemeColorService().color(for: selectedMode.wellnessTheme)
     }
 
     init(
         mode: DailyMode,
         period: DailySchedulePeriod?,
         isRegularWidth: Bool = false,
-        onSave: @escaping (DailySchedulePeriod) -> String?,
+        onSave: @escaping (DailyMode, DailySchedulePeriod) -> String?,
         onDelete: (() -> Void)? = nil,
-        sleepReminderLeadMinutes: Binding<Int>? = nil
+        sleepReminderLeadMinutes: Binding<Int>
     ) {
-        self.mode = mode
         initialPeriod = period
         self.isRegularWidth = isRegularWidth
         self.onSave = onSave
         self.onDelete = onDelete
         self.sleepReminderLeadMinutes = sleepReminderLeadMinutes
 
-        let iPadHeight: CGFloat = sleepReminderLeadMinutes == nil ? 420 : 560
+        let iPadHeight: CGFloat = 560
         iPadPreferredHeight = iPadHeight
         _iPadSelectedDetent = State(initialValue: .height(iPadHeight))
+        _selectedMode = State(initialValue: mode)
 
         let defaultStart = mode == .sleeping ? 23 : 9
         let defaultEnd = mode == .sleeping ? 7 : 18
@@ -75,7 +75,7 @@ struct SchedulePeriodEditorView: View {
             .background {
                 AmbientBackground(color: accent)
             }
-            .navigationTitle(mode.title)
+            .navigationTitle(selectedMode.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -98,6 +98,10 @@ struct SchedulePeriodEditorView: View {
                         }
                     }
                 }
+            }
+            .onChange(of: selectedMode) { _, mode in
+                guard initialPeriod == nil else { return }
+                applyDefaults(for: mode)
             }
             .alert(
                 "Cannot Save Schedule",
@@ -133,23 +137,32 @@ struct SchedulePeriodEditorView: View {
 
     private var editorSurface: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Label(mode == .sleeping ? "Sleep" : "Work", systemImage: mode.icon)
-                .font(.headline)
-                .padding(.bottom, 8)
+            Picker(selection: $selectedMode) {
+                ForEach(DailyMode.scheduleModes, id: \.key) { mode in
+                    Label(mode.title, systemImage: mode.icon)
+                        .tag(mode)
+                }
+            } label: {
+                Label(selectedMode.title, systemImage: selectedMode.icon)
+                    .font(.headline)
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .padding(.bottom, 8)
 
             timePickerRow(
-                title: mode == .sleeping ? "Bedtime" : "Work starts",
+                title: selectedMode == .sleeping ? "Bedtime" : "Work starts",
                 selection: $start,
                 picker: .start
             )
 
             timePickerRow(
-                title: mode == .sleeping ? "Wake up" : "Work ends",
+                title: selectedMode == .sleeping ? "Wake up" : "Work ends",
                 selection: $end,
                 picker: .end
             )
 
-            if let sleepReminderLeadMinutes {
+            if selectedMode == .sleeping {
                 Divider()
                     .padding(.top, 16)
 
@@ -316,7 +329,7 @@ struct SchedulePeriodEditorView: View {
         let startComponents = components(from: start)
         let endComponents = components(from: end)
         guard startComponents != endComponents else {
-            errorMessage = mode == .sleeping
+            errorMessage = selectedMode == .sleeping
                 ? "Your bedtime and wake-up time cannot be the same."
                 : "Your work start time and end time cannot be the same."
             return
@@ -329,7 +342,7 @@ struct SchedulePeriodEditorView: View {
             days: days
         )
 
-        if let message = onSave(period) {
+        if let message = onSave(selectedMode, period) {
             errorMessage = message
         } else {
             dismiss()
@@ -350,6 +363,14 @@ struct SchedulePeriodEditorView: View {
                 minute: components.minute
             )
         ) ?? .now
+    }
+
+    private func applyDefaults(for mode: DailyMode) {
+        let defaultStart = mode == .sleeping ? 23 : 9
+        let defaultEnd = mode == .sleeping ? 7 : 18
+        start = Self.time(from: DateComponents(hour: defaultStart))
+        end = Self.time(from: DateComponents(hour: defaultEnd))
+        days = mode == .sleeping ? Set(Weekday.allCases) : Weekday.defaultWorkdays
     }
 }
 

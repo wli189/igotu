@@ -5,10 +5,15 @@
 //  Created by Brian Li on 8/19/26.
 //
 
-public enum DailyMode: Equatable {
+public enum DailyMode: Equatable, Hashable {
     case sleeping
     case work
     case idle
+
+    /// Modes that can own an explicit schedule period.
+    public static var scheduleModes: [DailyMode] {
+        [.sleeping, .work]
+    }
 
     public var title: String {
         switch self {

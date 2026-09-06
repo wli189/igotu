@@ -151,15 +151,13 @@ struct SetUpView: View {
                 mode: editor.mode,
                 period: editor.period,
                 isRegularWidth: horizontalSizeClass == .regular,
-                onSave: { period in
-                    save(period, for: editor.mode)
+                onSave: { mode, period in
+                    save(period, for: mode, replacing: editor.mode)
                 },
                 onDelete: editor.period.map { period in
                     { delete(period, from: editor.mode) }
                 },
-                sleepReminderLeadMinutes: editor.mode == .sleeping
-                    ? $sleepReminderLeadMinutes
-                    : nil
+                sleepReminderLeadMinutes: $sleepReminderLeadMinutes
             )
         }
     }
@@ -180,33 +178,59 @@ struct SetUpView: View {
 
     private func scheduleSection(accent: Color) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeading("Schedule", systemImage: "calendar", accent: accent)
+            HStack(alignment: .firstTextBaseline) {
+                sectionHeading("Schedule", systemImage: "calendar", accent: accent)
+                Spacer()
+                addTimePeriodButton
+            }
 
             groupedSurface {
-                VStack(alignment: .leading, spacing: 0) {
-                    schedulePeriodsContent(
-                        title: "Sleep",
-                        systemImage: "moon.fill",
-                        mode: .sleeping,
-                        periods: sleepPeriods,
-                        accent: accent
-                    )
+                Group {
+                    if sleepPeriods.isEmpty && workPeriods.isEmpty {
+                        emptyScheduleContent
+                    } else {
+                        VStack(alignment: .leading, spacing: 0) {
+                            if !sleepPeriods.isEmpty {
+                                schedulePeriodsContent(
+                                    title: "Sleep",
+                                    systemImage: "moon.fill",
+                                    mode: .sleeping,
+                                    periods: sleepPeriods,
+                                    accent: accent
+                                )
+                            }
 
-                    Divider()
-                        .padding(.leading, 44)
+                            if !sleepPeriods.isEmpty && !workPeriods.isEmpty {
+                                Divider()
+                                    .padding(.leading, 44)
+                            }
 
-                    schedulePeriodsContent(
-                        title: "Work",
-                        systemImage: "briefcase.fill",
-                        mode: .work,
-                        periods: workPeriods,
-                        accent: accent
-                    )
+                            if !workPeriods.isEmpty {
+                                schedulePeriodsContent(
+                                    title: "Work",
+                                    systemImage: "briefcase.fill",
+                                    mode: .work,
+                                    periods: workPeriods,
+                                    accent: accent
+                                )
+                            }
+                        }
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
             }
         }
+    }
+
+    private var emptyScheduleContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("No schedule periods")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func schedulePeriodsContent(
@@ -222,42 +246,35 @@ struct SetUpView: View {
                 .foregroundStyle(.primary)
                 .padding(.bottom, 2)
 
-            if periods.isEmpty {
-                Text("No time periods")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 10)
-            } else {
-                ForEach(Array(periods.sorted(by: periodSort).enumerated()), id: \.element.id) { index, period in
-                    if index > 0 {
-                        Divider()
-                            .padding(.leading, 48)
-                    }
-
-                    periodRow(
-                        period,
-                        mode: mode,
-                        accent: accent
-                    )
+            ForEach(Array(periods.sorted(by: periodSort).enumerated()), id: \.element.id) { index, period in
+                if index > 0 {
+                    Divider()
+                        .padding(.leading, 48)
                 }
-            }
 
-            if mode != .sleeping || periods.isEmpty {
-                Button {
-                    editorConfiguration = SchedulePeriodEditorConfiguration(
-                        mode: mode,
-                        period: nil
-                    )
-                } label: {
-                    Label("Add time period", systemImage: "plus.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .buttonStyle(.borderless)
-                .padding(.top, 10)
+                periodRow(
+                    period,
+                    mode: mode,
+                    accent: accent
+                )
             }
         }
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var addTimePeriodButton: some View {
+        Button {
+            editorConfiguration = SchedulePeriodEditorConfiguration(
+                mode: .work,
+                period: nil
+            )
+        } label: {
+            Label("Add time period", systemImage: "plus.circle.fill")
+                .font(.subheadline.weight(.semibold))
+        }
+        .buttonStyle(.borderless)
+        .accessibilityHint("Choose a mode in the editor")
     }
 
     private func periodRow(
@@ -303,9 +320,21 @@ struct SetUpView: View {
         .accessibilityLabel("Edit " + mode.title + " time period")
     }
 
-    private func save(_ period: DailySchedulePeriod, for mode: DailyMode) -> String? {
+    private func save(
+        _ period: DailySchedulePeriod,
+        for mode: DailyMode,
+        replacing originalMode: DailyMode
+    ) -> String? {
         var proposedSleepPeriods = sleepPeriods
         var proposedWorkPeriods = workPeriods
+
+        if mode != originalMode {
+            if originalMode == .sleeping {
+                proposedSleepPeriods.removeAll { $0.id == period.id }
+            } else {
+                proposedWorkPeriods.removeAll { $0.id == period.id }
+            }
+        }
 
         if mode == .sleeping {
             if let index = proposedSleepPeriods.firstIndex(where: { $0.id == period.id }) {
