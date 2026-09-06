@@ -48,7 +48,15 @@ struct MacAmbientBackground: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+
+            RadialGradient(
+                colors: [accent.opacity(0.14), .clear],
+                center: .topLeading,
+                startRadius: 0,
+                endRadius: 460
+            )
         }
+        .animation(.easeInOut(duration: 1.2), value: accent)
         .ignoresSafeArea()
     }
 }
