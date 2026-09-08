@@ -75,17 +75,33 @@ struct AppConfigurationStoreTests {
         }
 
         let firstStore = AppConfigurationStore(defaults: defaults)
-        firstStore.setReminderEnabled(false, for: .hydration, in: .work)
+        firstStore.removeReminder(for: .hydration, in: .work)
         firstStore.setReminderFrequency(.frequent, for: .movement, in: .idle)
 
         let restoredStore = AppConfigurationStore(defaults: defaults)
 
-        #expect(!restoredStore.reminderRule(for: .hydration, in: .work).isEnabled)
+        #expect(restoredStore.availableReminderBehaviors(in: .work).contains(.hydration))
         #expect(restoredStore.reminderRule(for: .hydration, in: .idle).isEnabled)
         #expect(restoredStore.reminderRule(for: .movement, in: .idle).frequency.isCustom)
         #expect(restoredStore.reminderRule(for: .movement, in: .idle).frequency.interval == ReminderFrequency.frequent.interval)
         #expect(restoredStore.reminderRule(for: .movement, in: .work).frequency.isCustom)
         #expect(restoredStore.reminderRule(for: .movement, in: .work).frequency.interval == ReminderFrequency.regular.interval)
+    }
+
+    @Test func normalizesDisabledSavedRuleAsAnEnabledMember() throws {
+        let suiteName = "DisabledReminderMigrationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let savedRules = [
+            ReminderRule(behavior: .hydration, isEnabled: false, frequency: .frequent)
+        ]
+        defaults.set(try JSONEncoder().encode(savedRules), forKey: "workReminders")
+
+        let store = AppConfigurationStore(defaults: defaults)
+
+        #expect(store.workReminders.map(\.behavior) == [.hydration])
+        #expect(store.reminderRule(for: .hydration, in: .work).isEnabled)
     }
 
     @Test func restoresCustomFrequencySettings() {
@@ -214,7 +230,7 @@ struct AppConfigurationStoreTests {
         #expect(store.dailyGoals == DailyGoals(hydrationCount: 20, standingHours: 1))
     }
 
-    @Test func fillsMissingRulesAndKeepsLastDuplicate() throws {
+    @Test func preservesSavedReminderMembershipAndKeepsLastDuplicate() throws {
         let suiteName = "ReminderRulesNormalizationTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -230,12 +246,38 @@ struct AppConfigurationStoreTests {
 
         let store = AppConfigurationStore(defaults: defaults)
 
-        #expect(store.workReminders.map(\.behavior) == Behavior.allCases)
+        #expect(store.workReminders.map(\.behavior) == [.hydration])
         #expect(store.reminderRule(for: .hydration, in: .work).isEnabled)
         #expect(store.reminderRule(for: .hydration, in: .work).frequency.isCustom)
         #expect(store.reminderRule(for: .hydration, in: .work).frequency.interval == ReminderFrequency.occasional.interval)
         #expect(store.reminderRule(for: .standUp, in: .work).frequency.isCustom)
         #expect(store.reminderRule(for: .standUp, in: .work).frequency.interval == ReminderFrequency.frequent.interval)
         #expect(store.reminderRule(for: .movement, in: .work).frequency.isCustom)
+    }
+
+    @Test func remindersCanBeAddedAndRemovedPerContext() throws {
+        let suiteName = "ReminderMembershipTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(try JSONEncoder().encode([ReminderRule]()), forKey: "workReminders")
+        defaults.set(try JSONEncoder().encode([ReminderRule]()), forKey: "idleReminders")
+
+        let store = AppConfigurationStore(defaults: defaults)
+        #expect(store.workReminders.isEmpty)
+        #expect(store.idleReminders.isEmpty)
+
+        store.addReminder(for: .hydration, in: .work)
+        #expect(store.workReminders.map(\.behavior) == [.hydration])
+        #expect(!store.availableReminderBehaviors(in: .work).contains(.hydration))
+        #expect(store.availableReminderBehaviors(in: .idle).contains(.hydration))
+
+        store.removeReminder(for: .hydration, in: .work)
+        #expect(store.workReminders.isEmpty)
+        #expect(store.availableReminderBehaviors(in: .work).contains(.hydration))
+
+        let restoredStore = AppConfigurationStore(defaults: defaults)
+        #expect(restoredStore.workReminders.isEmpty)
+        #expect(restoredStore.idleReminders.isEmpty)
     }
 }

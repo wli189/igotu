@@ -39,6 +39,21 @@ struct ReminderEngineTests {
         #expect(result.dueAt == now.addingTimeInterval(55 * 60))
     }
 
+    @Test func defaultOffsetProviderReturnsWholeMinutesWithinRange() throws {
+        let frequency = ReminderFrequency(
+            interval: 60 * 60,
+            offsetRange: -8 * 60 ... 8 * 60
+        )
+        let engine = ReminderEngine()
+        let result = try #require(engine.nextReminder(from: input(rules: [
+            ReminderRule(behavior: .hydration, isEnabled: true, frequency: frequency)
+        ])))
+        let offset = result.dueAt.timeIntervalSince(now) - frequency.interval
+
+        #expect(offset >= frequency.offsetRange.lowerBound)
+        #expect(offset <= frequency.offsetRange.upperBound)
+        #expect(offset.truncatingRemainder(dividingBy: 60) == 0)
+    }
     @Test func sleepingModeDoesNotProduceReminder() {
         let result = engine.nextReminder(from: input(mode: .sleeping))
 

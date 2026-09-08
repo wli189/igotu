@@ -9,7 +9,6 @@ struct SchedulePeriodEditorView: View {
     private let iPadPreferredHeight: CGFloat
     let onSave: (DailyMode, DailySchedulePeriod) -> String?
     let onDelete: (() -> Void)?
-    let sleepReminderLeadMinutes: Binding<Int>
 
     @State private var selectedMode: DailyMode
     @State private var start: Date
@@ -24,7 +23,6 @@ struct SchedulePeriodEditorView: View {
     private enum TimePicker: Equatable {
         case start
         case end
-        case windDown
     }
 
     private var accent: Color {
@@ -36,14 +34,12 @@ struct SchedulePeriodEditorView: View {
         period: DailySchedulePeriod?,
         isRegularWidth: Bool = false,
         onSave: @escaping (DailyMode, DailySchedulePeriod) -> String?,
-        onDelete: (() -> Void)? = nil,
-        sleepReminderLeadMinutes: Binding<Int>
+        onDelete: (() -> Void)? = nil
     ) {
         initialPeriod = period
         self.isRegularWidth = isRegularWidth
         self.onSave = onSave
         self.onDelete = onDelete
-        self.sleepReminderLeadMinutes = sleepReminderLeadMinutes
 
         let iPadHeight: CGFloat = 560
         iPadPreferredHeight = iPadHeight
@@ -162,11 +158,14 @@ struct SchedulePeriodEditorView: View {
                 picker: .end
             )
 
-            if selectedMode == .sleeping {
+            if selectedMode == .work {
                 Divider()
                     .padding(.top, 16)
 
-                sleepReminderContent(minutes: sleepReminderLeadMinutes)
+                ReminderRulesEditorView(
+                    context: .work,
+                    title: "Reminder frequency"
+                )
             }
 
             Divider()
@@ -184,57 +183,6 @@ struct SchedulePeriodEditorView: View {
         }
         .padding(20)
         .ambientSurface(cornerRadius: 24)
-    }
-
-    private func sleepReminderContent(minutes: Binding<Int>) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                togglePicker(.windDown)
-            } label: {
-                HStack {
-                    Text("Wind down")
-
-                    Spacer()
-
-                    HStack(spacing: 8) {
-                        Text("\(minutes.wrappedValue) min")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .frame(minHeight: 44)
-            }
-
-            if expandedTimePicker == .windDown {
-                Picker("Wind down", selection: minutes) {
-                    ForEach(sleepReminderLeadMinuteOptions, id: \.self) { option in
-                        Text("\(option) min")
-                            .tag(option)
-                    }
-                }
-                .pickerStyle(.wheel)
-                .labelsHidden()
-                .frame(maxWidth: .infinity)
-                .frame(height: 180)
-                .clipped()
-            }
-        }
-        .buttonStyle(.plain)
-        .padding(.vertical, 12)
-    }
-
-    private var sleepReminderLeadMinuteOptions: [Int] {
-        Array(
-            stride(
-                from: Int(ReminderTiming.minimumSleepReminderLeadTime / 60),
-                through: Int(ReminderTiming.maximumSleepReminderLeadTime / 60),
-                by: Int(ReminderTiming.sleepReminderLeadTimeStep / 60)
-            )
-        )
     }
 
     private func timePickerRow(

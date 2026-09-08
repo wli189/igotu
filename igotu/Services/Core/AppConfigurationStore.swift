@@ -106,11 +106,32 @@ final class AppConfigurationStore: ObservableObject {
         let rules = context == .work ? workReminders : idleReminders
         return rules.first { $0.behavior == behavior }
             ?? Self.defaultReminderRules(for: context).first { $0.behavior == behavior }
-            ?? ReminderRule(
-                behavior: behavior,
-                isEnabled: false,
-                frequency: ReminderFrequency(interval: 60 * 60, offsetRange: -8 * 60 ... 8 * 60)
-            )
+            ?? Self.fallbackReminderRule(for: behavior)
+    }
+
+    func availableReminderBehaviors(in context: ReminderContext) -> [Behavior] {
+        let rules = context == .work ? workReminders : idleReminders
+        return Behavior.allCases.filter { behavior in
+            !rules.contains { $0.behavior == behavior }
+        }
+    }
+
+    func addReminder(for behavior: Behavior, in context: ReminderContext) {
+        let rules = context == .work ? workReminders : idleReminders
+        guard !rules.contains(where: { $0.behavior == behavior }) else { return }
+
+        update(reminderRule(for: behavior, in: context), in: context)
+    }
+
+    func removeReminder(for behavior: Behavior, in context: ReminderContext) {
+        switch context {
+        case .work:
+            workReminders.removeAll { $0.behavior == behavior }
+            persist(workReminders, forKey: Key.workReminders)
+        case .idle:
+            idleReminders.removeAll { $0.behavior == behavior }
+            persist(idleReminders, forKey: Key.idleReminders)
+        }
     }
 
     func setReminderEnabled(
@@ -145,7 +166,7 @@ final class AppConfigurationStore: ObservableObject {
             return defaultValue
         }
 
-        return normalizedReminderRules(rules, defaultValue: defaultValue)
+        return normalizedReminderRules(rules)
     }
 
     private static func loadDailyGoals(from defaults: UserDefaults) -> DailyGoals {
@@ -182,21 +203,23 @@ final class AppConfigurationStore: ObservableObject {
     }
 
     private static func normalizedReminderRules(
-        _ rules: [ReminderRule],
-        defaultValue: [ReminderRule]
+        _ rules: [ReminderRule]
     ) -> [ReminderRule] {
         var rulesByBehavior: [Behavior: ReminderRule] = [:]
-
-        for rule in defaultValue {
-            rulesByBehavior[rule.behavior] = rule
-        }
-
         for rule in rules {
             rulesByBehavior[rule.behavior] = rule
         }
 
-        return Behavior.allCases.compactMap { rulesByBehavior[$0] }.map { rule in
+        var normalizedRules: [ReminderRule] = []
+        for rule in rules {
+            guard !normalizedRules.contains(where: { $0.behavior == rule.behavior }),
+                  let normalizedRule = rulesByBehavior[rule.behavior] else { continue }
+            normalizedRules.append(normalizedRule)
+        }
+
+        return normalizedRules.map { rule in
             var customRule = rule
+            customRule.isEnabled = true
             customRule.frequency = rule.frequency.customValue
             return customRule
         }
@@ -206,6 +229,14 @@ final class AppConfigurationStore: ObservableObject {
         for context: ReminderContext
     ) -> [ReminderRule] {
         context == .work ? defaultWorkReminders : defaultIdleReminders
+    }
+
+    private static func fallbackReminderRule(for behavior: Behavior) -> ReminderRule {
+        ReminderRule(
+            behavior: behavior,
+            isEnabled: true,
+            frequency: ReminderFrequency(interval: 60 * 60, offsetRange: -8 * 60 ... 8 * 60)
+        )
     }
 
     private func update(_ rule: ReminderRule, in context: ReminderContext) {

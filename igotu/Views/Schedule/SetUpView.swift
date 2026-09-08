@@ -156,8 +156,7 @@ struct SetUpView: View {
                 },
                 onDelete: editor.period.map { period in
                     { delete(period, from: editor.mode) }
-                },
-                sleepReminderLeadMinutes: $sleepReminderLeadMinutes
+                }
             )
         }
     }
@@ -429,6 +428,11 @@ struct SetUpView: View {
 
             groupedSurface {
                 VStack(spacing: 0) {
+                    windDownSettingsRow(accent: accent)
+
+                    Divider()
+                        .padding(.leading, 62)
+
                     settingsLink(
                         title: "Work reminders",
                         systemImage: "briefcase.fill",
@@ -461,6 +465,50 @@ struct SetUpView: View {
                 }
             }
         }
+    }
+
+    private func windDownSettingsRow(accent: Color) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "moon.zzz.fill")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(accent)
+                .frame(width: 38, height: 38)
+                .background(
+                    accent.opacity(0.12),
+                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Wind down")
+                    .font(.body.weight(.medium))
+            }
+
+            Spacer(minLength: 8)
+
+            Picker("Wind down lead time", selection: Binding(
+                get: { sleepReminderLeadMinutes },
+                set: { sleepReminderLeadMinutes = $0 }
+            )) {
+                ForEach(sleepReminderLeadMinuteOptions, id: \.self) { minutes in
+                    Text("\(minutes) min")
+                        .tag(minutes)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 110)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    private var sleepReminderLeadMinuteOptions: [Int] {
+        Array(
+            stride(
+                from: Int(ReminderTiming.minimumSleepReminderLeadTime / 60),
+                through: Int(ReminderTiming.maximumSleepReminderLeadTime / 60),
+                by: Int(ReminderTiming.sleepReminderLeadTimeStep / 60)
+            )
+        )
     }
 
     private func dailyGoalsSection(accent: Color) -> some View {

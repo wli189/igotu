@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-`igotu` is an iOS/iPadOS SwiftUI app prototype for context-aware wellness reminders. The product and implementation baseline is documented in [Igotu Product Baseline.md](Igotu%20Product%20Baseline.md), and the visual direction is documented in [DESIGN.md](DESIGN.md). The app stores its schedule, reminder rules, daily goals, and reminder history in `UserDefaults`. The current notification architecture schedules multiple event-specific local notifications within a rolling window. Foreground delivery uses an in-app confirmation prompt; opening a background notification presents a full-screen confirmation view. `IgotuCore` is a local Swift package compiled for both iOS and macOS.
+`igotu` is an iOS/iPadOS SwiftUI app prototype for context-aware wellness reminders. The product and implementation baseline is documented in [Igotu Product Baseline.md](Igotu%20Product%20Baseline.md), and the visual direction is documented in [DESIGN.md](DESIGN.md). The app stores its schedule, reminder rules, daily goals, and reminder history in `UserDefaults`. The current notification architecture schedules multiple event-specific local notifications within a rolling window. Foreground delivery uses an in-app confirmation prompt; opening a background notification presents a full-screen confirmation view. `IgotuCore` is a local Swift package shared by the app and test targets.
 
 ## Development commands
 
-The project requires Xcode 26.6, targets iOS 26.5 and macOS 26.0, and includes the `igotu`, `igotuMac`, `igotuTests`, and `igotuUITests` targets.
+The project requires Xcode 26.6, targets iOS 26.5, and includes the `igotu`, `igotuTests`, and `igotuUITests` targets. The macOS target (`igotuMac`) is currently removed from the project while the iOS app is stabilized; the macOS companion plan remains documented in `DESIGN.md` for a future rewrite.
 
 ```sh
 # Open the project in Xcode
@@ -65,7 +65,6 @@ Replace the simulator name/OS with a destination from `-showdestinations` when t
 - `igotu/Views/Reminders/ReminderToastView.swift` renders foreground reminder actions, while `ReminderConfirmationView.swift` renders the full-screen confirmation route opened from a notification.
 - `igotu/Services/Core/AppConfigurationStore.swift` persists configuration in `UserDefaults` and normalizes legacy or incomplete rules/goals on load. `ReminderHistoryStore` persists a bounded event history and applies cooldown, expiration, and completion rules.
 - `igotu/Resources/Assets.xcassets` contains the app icon and theme color catalogs. The Xcode project uses filesystem-synchronized groups, so Swift files added under app, extension, or test directories are picked up automatically.
-- `igotuMac/App/` contains the macOS product UI and runtime: a NavigationSplitView workspace with Today, Schedule, and Reminders surfaces, a macOS-specific UserDefaults-backed configuration/history store, and macOS `UserNotifications` scheduling/coordinator code. It reuses `IgotuCore` models while keeping iOS notification adapters out of the macOS target.
 
 ### Test targets
 
@@ -91,7 +90,7 @@ New UI should follow the Ambient Calm specification in `DESIGN.md`: native Swift
 
 ### Directory layout policy
 
-The canonical layout keeps iOS/iPadOS application code under `igotu/`, the shared core in `IgotuCore/`, and the macOS smoke-test target under `igotuMac/`:
+The canonical layout keeps iOS/iPadOS application code under `igotu/` and the shared core in `IgotuCore/`:
 
 ```text
 IgotuCore/
@@ -110,26 +109,13 @@ igotu/
 ├── DesignSystem/               # Shared SwiftUI styling and theme services
 └── Resources/                  # Asset catalogs and app resources
 
-igotuMac/
-├── App/                         # macOS app entry point
-├── Navigation/                  # macOS sidebar and root navigation
-├── Services/
-│   ├── Core/                    # macOS configuration and history stores
-│   └── macOS/                   # UserNotifications and reminder coordinator
-├── Views/
-│   ├── Today/                   # Today dashboard
-│   ├── Schedule/                # Schedule and goal editing
-│   └── Reminders/               # Reminder settings and confirmation UI
-└── DesignSystem/                # macOS-specific visual styles
 ```
 
 iPhone and iPadOS use the same target and the same `Services/iOS` implementation. UI differences are handled with size classes and adaptive SwiftUI layouts; do not create separate iPhone and iPad source trees. New iOS/iPadOS application code belongs under `igotu/`; platform-neutral logic belongs in `IgotuCore/`.
 
-The `igotuMac` target owns the desktop presentation and macOS-specific adapters. New macOS code belongs under `igotuMac/`; it should consume `IgotuCore` instead of duplicating schedule and reminder domain logic.
-
 ## Repository conventions
 
-- Keep platform-neutral models and services in `IgotuCore/`, iOS/iPadOS app code in `igotu/`, macOS app code in `igotuMac/`, unit tests in `igotuTests/`, and UI tests in `igotuUITests/`; the synchronized Xcode groups make the directory location part of target membership.
+- Keep platform-neutral models and services in `IgotuCore/`, iOS/iPadOS app code in `igotu/`, unit tests in `igotuTests/`, and UI tests in `igotuUITests/`; the synchronized Xcode groups make the directory location part of target membership.
 - Preserve SwiftUI previews with in-memory model containers so previews do not write to the persistent store.
 - Keep scheduling, time-zone, and configuration behavior covered by focused tests before changing shared modules.
 - The repository has no external package manager dependencies or custom lint command; `IgotuCore` is a local Swift package. Use Xcode compiler warnings, `swift build` in `IgotuCore/`, and `xcodebuild` for verification.

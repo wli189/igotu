@@ -42,7 +42,9 @@ public struct ReminderEngine {
 
     public init(
         offsetProvider: @escaping OffsetProvider = { frequency in
-            Double.random(in: frequency.offsetRange)
+            let lowerBoundMinutes = Int((frequency.offsetRange.lowerBound / 60).rounded(.up))
+            let upperBoundMinutes = Int((frequency.offsetRange.upperBound / 60).rounded(.down))
+            return TimeInterval(Int.random(in: lowerBoundMinutes ... upperBoundMinutes) * 60)
         },
         expirationGracePeriod: TimeInterval = ReminderTiming.expirationGracePeriod
     ) {

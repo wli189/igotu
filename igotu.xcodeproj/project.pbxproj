@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		D3C0BACE304BDC2800EF7B17 /* IgotuCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000031 /* IgotuCore */; };
-		D3C0BACF304BDC2800EF7B17 /* IgotuCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000031 /* IgotuCore */; };
 		D3C0BAD0304BDC2800EF7B17 /* IgotuCore in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000031 /* IgotuCore */; };
 /* End PBXBuildFile section */
 
@@ -30,18 +29,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A10000000000000000000010 /* igotuMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = igotuMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D34C240B3033C5A800CBCA6B /* igotu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = igotu.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D34C241A3033C5A900CBCA6B /* igotuTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = igotuTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D34C24243033C5A900CBCA6B /* igotuUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = igotuUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A10000000000000000000011 /* igotuMac */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = igotuMac;
-			sourceTree = "<group>";
-		};
 		D34C240D3033C5A800CBCA6B /* igotu */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = igotu;
@@ -60,14 +53,6 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		A10000000000000000000012 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				D3C0BACF304BDC2800EF7B17 /* IgotuCore in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		D34C24083033C5A800CBCA6B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -98,7 +83,6 @@
 			isa = PBXGroup;
 			children = (
 				D34C240D3033C5A800CBCA6B /* igotu */,
-				A10000000000000000000011 /* igotuMac */,
 				D34C241D3033C5A900CBCA6B /* igotuTests */,
 				D34C24273033C5A900CBCA6B /* igotuUITests */,
 				D34C240C3033C5A800CBCA6B /* Products */,
@@ -109,7 +93,6 @@
 			isa = PBXGroup;
 			children = (
 				D34C240B3033C5A800CBCA6B /* igotu.app */,
-				A10000000000000000000010 /* igotuMac.app */,
 				D34C241A3033C5A900CBCA6B /* igotuTests.xctest */,
 				D34C24243033C5A900CBCA6B /* igotuUITests.xctest */,
 			);
@@ -119,29 +102,6 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A10000000000000000000020 /* igotuMac */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = A10000000000000000000026 /* Build configuration list for PBXNativeTarget "igotuMac" */;
-			buildPhases = (
-				A10000000000000000000013 /* Sources */,
-				A10000000000000000000012 /* Frameworks */,
-				A10000000000000000000014 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				A10000000000000000000011 /* igotuMac */,
-			);
-			name = igotuMac;
-			packageProductDependencies = (
-				A10000000000000000000031 /* IgotuCore */,
-			);
-			productName = igotuMac;
-			productReference = A10000000000000000000010 /* igotuMac.app */;
-			productType = "com.apple.product-type.application";
-		};
 		D34C240A3033C5A800CBCA6B /* igotu */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = D34C242E3033C5A900CBCA6B /* Build configuration list for PBXNativeTarget "igotu" */;
@@ -220,12 +180,9 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2660;
-				LastUpgradeCheck = 2660;
-				TargetAttributes = {
-					A10000000000000000000020 = {
-						CreatedOnToolsVersion = 26.6;
-					};
-					D34C240A3033C5A800CBCA6B = {
+					LastUpgradeCheck = 2660;
+					TargetAttributes = {
+						D34C240A3033C5A800CBCA6B = {
 						CreatedOnToolsVersion = 26.6;
 					};
 					D34C24193033C5A900CBCA6B = {
@@ -256,7 +213,6 @@
 			projectRoot = "";
 			targets = (
 				D34C240A3033C5A800CBCA6B /* igotu */,
-				A10000000000000000000020 /* igotuMac */,
 				D34C24193033C5A900CBCA6B /* igotuTests */,
 				D34C24233033C5A900CBCA6B /* igotuUITests */,
 			);
@@ -264,13 +220,6 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		A10000000000000000000014 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		D34C24093033C5A800CBCA6B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -295,13 +244,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A10000000000000000000013 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		D34C24073033C5A800CBCA6B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -339,44 +281,6 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		A10000000000000000000024 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 932AJN75G8;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = brian.igotu.mac;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Debug;
-		};
-		A10000000000000000000025 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 932AJN75G8;
-				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = brian.igotu.mac;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SDKROOT = macosx;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
-				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
 		D34C242C3033C5A900CBCA6B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -645,15 +549,6 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A10000000000000000000026 /* Build configuration list for PBXNativeTarget "igotuMac" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				A10000000000000000000024 /* Debug */,
-				A10000000000000000000025 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		D34C24063033C5A800CBCA6B /* Build configuration list for PBXProject "igotu" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
