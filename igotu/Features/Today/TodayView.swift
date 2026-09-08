@@ -77,8 +77,35 @@ struct TodayView: View {
     }
 }
 
-#Preview {
+#Preview("Work") {
     TodayView()
-        .environmentObject(AppConfigurationStore())
-        .environmentObject(ReminderHistoryStore())
+        .environmentObject(
+            PreviewSupport.configuration(
+                named: "today-work",
+                schedule: PreviewSupport.allDayWorkSchedule
+            )
+        )
+        .environmentObject(PreviewSupport.history(named: "today-work"))
+}
+
+#Preview("Sleeping") {
+    TodayView()
+        .environmentObject(
+            PreviewSupport.configuration(
+                named: "today-sleeping",
+                schedule: PreviewSupport.allDaySleepSchedule
+            )
+        )
+        .environmentObject(PreviewSupport.history(named: "today-sleeping"))
+}
+
+#Preview("No Schedule") {
+    TodayView()
+        .environmentObject(
+            PreviewSupport.configuration(
+                named: "today-empty",
+                schedule: PreviewSupport.emptySchedule
+            )
+        )
+        .environmentObject(PreviewSupport.history(named: "today-empty"))
 }

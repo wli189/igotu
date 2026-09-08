@@ -187,3 +187,18 @@ struct NotificationTestView: View {
         return "in \(seconds)s"
     }
 }
+
+#Preview {
+    let configuration = PreviewSupport.configuration(named: "notification-test")
+    let history = PreviewSupport.history(named: "notification-test")
+
+    NavigationStack {
+        NotificationTestView()
+    }
+    .environmentObject(
+        PreviewSupport.reminderCoordinator(
+            configuration: configuration,
+            history: history
+        )
+    )
+}

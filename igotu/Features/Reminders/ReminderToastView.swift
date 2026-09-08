@@ -97,3 +97,9 @@ struct ExpiredReminderToastView: View {
     .padding(.top, 100)
     .background(Color(.systemGroupedBackground))
 }
+
+#Preview("Expired") {
+    ExpiredReminderToastView()
+        .padding(.top, 100)
+        .background(Color(.systemGroupedBackground))
+}

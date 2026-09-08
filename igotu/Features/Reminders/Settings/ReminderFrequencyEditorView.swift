@@ -1,134 +1,8 @@
-
 import Foundation
 import SwiftUI
 import IgotuCore
 
-struct ReminderSettingsView: View {
-    let context: ReminderContext
-    private let themeColorService = ThemeColorService()
-
-    @EnvironmentObject private var configuration: AppConfigurationStore
-
-    var body: some View {
-        let accent = themeColorService.currentColor(for: configuration.schedule)
-
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Reminders", systemImage: "bell.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(accent)
-
-                ReminderRulesEditorView(context: context)
-                    .ambientSurface(cornerRadius: 24)
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 16)
-            .padding(.bottom, 24)
-        }
-        .scrollIndicators(.hidden)
-        .background {
-            AmbientBackground(color: accent)
-        }
-        .tint(accent)
-        .navigationTitle(context.title)
-    }
-
-}
-
-struct ReminderRulesEditorView: View {
-    @EnvironmentObject private var configuration: AppConfigurationStore
-
-    let context: ReminderContext
-    var title: String?
-
-    private var rules: [ReminderRule] {
-        context == .work
-            ? configuration.workReminders
-            : configuration.idleReminders
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                if let title {
-                    Text(title)
-                        .font(.headline)
-                }
-
-                Spacer()
-                addReminderMenu
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-
-            ForEach(Array(rules.enumerated()), id: \.element.behavior) { index, rule in
-                if index > 0 {
-                    Divider()
-                        .padding(.horizontal, 16)
-                }
-
-                reminderRow(for: rule.behavior)
-            }
-
-            if rules.isEmpty {
-                Text("No reminders added")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-            }
-        }
-    }
-
-    private var addReminderMenu: some View {
-        Menu {
-            ForEach(configuration.availableReminderBehaviors(in: context)) { behavior in
-                Button {
-                    configuration.addReminder(for: behavior, in: context)
-                } label: {
-                    Label(behavior.title, systemImage: behavior.icon)
-                }
-            }
-        } label: {
-            Image(systemName: "plus")
-        }
-        .disabled(configuration.availableReminderBehaviors(in: context).isEmpty)
-        .buttonStyle(.bordered)
-    }
-
-    private func reminderRow(for behavior: Behavior) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
-                Image(systemName: behavior.icon)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.tint)
-                    .frame(width: 34, height: 34)
-                    .background(Color.accentColor.opacity(0.12), in: Circle())
-
-                Text(behavior.title)
-                    .font(.body.weight(.semibold))
-
-                Spacer(minLength: 8)
-
-                Button(role: .destructive) {
-                    configuration.removeReminder(for: behavior, in: context)
-                } label: {
-                    Image(systemName: "trash")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove reminder")
-            }
-
-            FrequencyEditorView(behavior: behavior, context: context)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-    }
-}
-
-private struct FrequencyEditorView: View {
+struct ReminderFrequencyEditorView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore
 
     let behavior: Behavior
@@ -377,8 +251,10 @@ private struct OffsetOption: Hashable, Identifiable {
 }
 
 #Preview {
-    NavigationStack {
-        ReminderSettingsView(context: .work)
-            .environmentObject(AppConfigurationStore())
-    }
+    ReminderFrequencyEditorView(
+        behavior: .hydration,
+        context: .work
+    )
+    .environmentObject(PreviewSupport.configuration(named: "reminder-frequency"))
+    .padding()
 }
