@@ -11,7 +11,9 @@ struct ReminderRulesEditorView: View {
     var horizontalPadding: CGFloat = 16
 
     private var rules: [ReminderRule] {
-        configuration.reminderRules(in: context)
+        configuration.reminderRules(in: context).filter {
+            context.mode.reminderPolicy.allowedBehaviors.contains($0.behavior)
+        }
     }
 
     var body: some View {

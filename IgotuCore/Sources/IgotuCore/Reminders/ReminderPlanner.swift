@@ -41,6 +41,7 @@ public struct ReminderPlanner {
         for schedule: DailySchedule,
         workRules: [ReminderRule],
         idleRules: [ReminderRule],
+        studyRules: [ReminderRule] = [],
         events: [ReminderEvent],
         now: Date = .now,
         rollingFrom: Date? = nil,
@@ -84,6 +85,7 @@ public struct ReminderPlanner {
                 schedule: schedule,
                 workRules: workRules,
                 idleRules: idleRules,
+                studyRules: studyRules,
                 now: now
             ) else {
                 eventIDsToCancel.insert(event.id)
@@ -145,7 +147,8 @@ public struct ReminderPlanner {
                     for: candidate.behavior,
                     in: candidate.mode,
                     workRules: workRules,
-                    idleRules: idleRules
+                    idleRules: idleRules,
+                    studyRules: studyRules
                 )?.isEnabled == true
                 && timeline.currentInterval(for: schedule, at: candidate.dueAt).mode
                     == candidate.mode
@@ -179,7 +182,8 @@ public struct ReminderPlanner {
             guard let rules = rules(
                 for: interval.mode,
                 workRules: workRules,
-                idleRules: idleRules
+                idleRules: idleRules,
+                studyRules: studyRules
             ) else { continue }
 
             let intervalEnd = min(interval.end, horizonEnd)
@@ -264,6 +268,7 @@ public struct ReminderPlanner {
         schedule: DailySchedule,
         workRules: [ReminderRule],
         idleRules: [ReminderRule],
+        studyRules: [ReminderRule],
         now: Date
     ) -> ReminderCandidate? {
         guard event.timestamp >= now,
@@ -272,7 +277,8 @@ public struct ReminderPlanner {
                   for: event.behavior,
                   in: mode,
                   workRules: workRules,
-                  idleRules: idleRules
+                  idleRules: idleRules,
+                  studyRules: studyRules
               ),
               rule.isEnabled,
               timeline.currentInterval(for: schedule, at: event.timestamp).mode == mode
@@ -291,12 +297,14 @@ public struct ReminderPlanner {
         for behavior: Behavior,
         in mode: DailyMode,
         workRules: [ReminderRule],
-        idleRules: [ReminderRule]
+        idleRules: [ReminderRule],
+        studyRules: [ReminderRule]
     ) -> ReminderRule? {
         return rules(
             for: mode,
             workRules: workRules,
-            idleRules: idleRules
+            idleRules: idleRules,
+            studyRules: studyRules
         )?.first { $0.behavior == behavior }
     }
 
@@ -311,13 +319,22 @@ public struct ReminderPlanner {
     private func rules(
         for mode: DailyMode,
         workRules: [ReminderRule],
-        idleRules: [ReminderRule]
+        idleRules: [ReminderRule],
+        studyRules: [ReminderRule]
     ) -> [ReminderRule]? {
         switch mode.reminderContext {
         case .work:
-            return workRules
+            return workRules.filter {
+                mode.reminderPolicy.allowedBehaviors.contains($0.behavior)
+            }
+        case .study:
+            return studyRules.filter {
+                mode.reminderPolicy.allowedBehaviors.contains($0.behavior)
+            }
         case .idle:
-            return idleRules
+            return idleRules.filter {
+                mode.reminderPolicy.allowedBehaviors.contains($0.behavior)
+            }
         case nil:
             return nil
         }

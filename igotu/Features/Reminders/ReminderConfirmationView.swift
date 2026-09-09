@@ -9,8 +9,7 @@ struct ReminderConfirmationView: View {
     private let themeColorService = ThemeColorService()
 
     private var accent: Color {
-        let theme: WellnessTheme = event.context == .work ? .work : .home
-        return themeColorService.color(for: theme)
+        themeColorService.color(for: event.context.wellnessTheme)
     }
 
     var body: some View {

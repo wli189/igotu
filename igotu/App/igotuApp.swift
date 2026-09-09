@@ -77,6 +77,9 @@ struct igotuApp: App {
             .onChange(of: configuration.workReminders) { _, _ in
                 refreshReminders(rolling: true)
             }
+            .onChange(of: configuration.studyReminders) { _, _ in
+                refreshReminders(rolling: true)
+            }
             .onChange(of: configuration.idleReminders) { _, _ in
                 refreshReminders(rolling: true)
             }

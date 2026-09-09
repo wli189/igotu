@@ -53,7 +53,7 @@ public struct DailyScheduleValidator {
                 switch mode {
                 case .sleeping: return .sleepTimesMatch
                 case .work: return .workTimesMatch
-                case .idle: return .modeTimesMatch(mode)
+                case .study, .idle: return .modeTimesMatch(mode)
                 }
             }
 
@@ -67,7 +67,7 @@ public struct DailyScheduleValidator {
                 switch mode {
                 case .sleeping: return .sleepPeriodsOverlap
                 case .work: return .workPeriodsOverlap
-                case .idle: return .modePeriodsOverlap(mode)
+                case .study, .idle: return .modePeriodsOverlap(mode)
                 }
             }
         }

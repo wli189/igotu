@@ -67,7 +67,7 @@ struct AppConfigurationStoreTests {
         #expect(store.reminderRule(for: .movement, in: .work).frequency.offsetRange == -8 * 60 ... 8 * 60)
     }
 
-    @Test func restoresReminderRulesIndependentlyForWorkAndIdle() {
+    @Test func restoresReminderRulesIndependentlyForEachMode() {
         let suiteName = "ReminderRulesTests-\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer {
@@ -77,6 +77,7 @@ struct AppConfigurationStoreTests {
         let firstStore = AppConfigurationStore(defaults: defaults)
         firstStore.removeReminder(for: .hydration, in: .work)
         firstStore.setReminderFrequency(.frequent, for: .movement, in: .idle)
+        firstStore.setReminderFrequency(.occasional, for: .standUp, in: .study)
 
         let restoredStore = AppConfigurationStore(defaults: defaults)
 
@@ -86,6 +87,41 @@ struct AppConfigurationStoreTests {
         #expect(restoredStore.reminderRule(for: .movement, in: .idle).frequency.interval == ReminderFrequency.frequent.interval)
         #expect(restoredStore.reminderRule(for: .movement, in: .work).frequency.isCustom)
         #expect(restoredStore.reminderRule(for: .movement, in: .work).frequency.interval == ReminderFrequency.regular.interval)
+        #expect(restoredStore.reminderRule(for: .standUp, in: .study).frequency.isCustom)
+        #expect(restoredStore.reminderRule(for: .standUp, in: .study).frequency.interval == ReminderFrequency.occasional.interval)
+    }
+
+    @Test func disallowedStudyReminderCannotBeAddedOrEdited() {
+        let suiteName = "StudyReminderPolicyTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let store = AppConfigurationStore(defaults: defaults)
+        store.removeReminder(for: .movement, in: .study)
+        store.addReminder(for: .movement, in: .study)
+        store.setReminderFrequency(.frequent, for: .movement, in: .study)
+
+        #expect(!store.studyReminders.contains { $0.behavior == .movement })
+        #expect(!store.availableReminderBehaviors(in: .study).contains(.movement))
+    }
+
+    @Test func ignoresDisallowedRulesSavedForStudy() throws {
+        let suiteName = "StudyReminderMigrationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        defaults.set(
+            try JSONEncoder().encode([
+                ReminderRule(behavior: .movement, isEnabled: true, frequency: .regular),
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .frequent)
+            ]),
+            forKey: "studyReminders"
+        )
+
+        let store = AppConfigurationStore(defaults: defaults)
+
+        #expect(!store.studyReminders.contains { $0.behavior == .movement })
+        #expect(store.studyReminders.map(\.behavior) == [.hydration])
     }
 
     @Test func normalizesDisabledSavedRuleAsAnEnabledMember() throws {

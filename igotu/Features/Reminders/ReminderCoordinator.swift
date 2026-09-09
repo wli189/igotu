@@ -278,6 +278,7 @@ final class ReminderCoordinator: ObservableObject {
             for: configuration.schedule,
             workRules: configuration.workReminders,
             idleRules: configuration.idleReminders,
+            studyRules: configuration.studyReminders,
             events: history.events,
             now: now,
             rollingFrom: rollingFrom,
@@ -548,12 +549,10 @@ final class ReminderCoordinator: ObservableObject {
         for event: ReminderEvent,
         dueAt: Date
     ) -> ReminderCandidate? {
-        let mode: DailyMode
-        switch event.context {
-        case .work:
-            mode = .work
-        case .idle:
-            mode = .idle
+        guard let mode = DailyMode.allCases.first(where: {
+            $0.reminderContext == event.context
+        }) else {
+            return nil
         }
 
         return ReminderCandidate(

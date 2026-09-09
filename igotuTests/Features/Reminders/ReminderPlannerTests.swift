@@ -358,6 +358,38 @@ struct ReminderPlannerTests {
         ))
     }
 
+    @Test func ignoresMovementRulesAndEventsInsideStudyMode() {
+        let studySchedule = DailySchedule(periodsByMode: [
+            .study: [DailySchedulePeriod(
+                start: DateComponents(hour: 9),
+                end: DateComponents(hour: 18),
+                days: [.thursday]
+            )]
+        ])
+        let movementEvent = ReminderEvent(
+            behavior: .movement,
+            context: .study,
+            timestamp: Self.date(year: 2026, month: 8, day: 27, hour: 10, minute: 15),
+            status: .scheduled
+        )
+
+        let plan = planner.plan(
+            for: studySchedule,
+            workRules: [],
+            idleRules: [],
+            studyRules: [
+                ReminderRule(behavior: .movement, isEnabled: true, frequency: .regular),
+                ReminderRule(behavior: .hydration, isEnabled: true, frequency: .frequent)
+            ],
+            events: [movementEvent],
+            now: Self.date(year: 2026, month: 8, day: 27, hour: 10)
+        )
+
+        #expect(plan.eventIDsToCancel == [movementEvent.id])
+        #expect(plan.reminders.allSatisfy { $0.candidate.behavior != .movement })
+        #expect(plan.reminders.contains { $0.candidate.behavior == .hydration })
+    }
+
     private static var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

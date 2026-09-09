@@ -14,6 +14,7 @@ final class AppConfigurationStore: ObservableObject {
         static let hasCompletedSetup = "hasCompletedSetup"
         static let schedule = "dailySchedule"
         static let workReminders = "workReminders"
+        static let studyReminders = "studyReminders"
         static let idleReminders = "idleReminders"
         static let dailyGoals = "dailyGoals"
         static let sleepReminderLeadTime = "sleepReminderLeadTime"
@@ -32,12 +33,17 @@ final class AppConfigurationStore: ObservableObject {
 
     private static let defaultIdleReminders = [
         ReminderRule(behavior: .hydration, isEnabled: true, frequency: ReminderFrequency(interval: 2 * 60 * 60, offsetRange: -8 * 60 ... 8 * 60)),
-        ReminderRule(behavior: .standUp, isEnabled: true, frequency: ReminderFrequency(interval: 2 * 60 * 60, offsetRange: -8 * 60 ... 8 * 60)),
         ReminderRule(behavior: .movement, isEnabled: true, frequency: ReminderFrequency(interval: 60 * 60, offsetRange: -8 * 60 ... 8 * 60))
+    ]
+
+    private static let defaultStudyReminders = [
+        ReminderRule(behavior: .hydration, isEnabled: true, frequency: ReminderFrequency(interval: 60 * 60, offsetRange: -8 * 60 ... 8 * 60)),
+        ReminderRule(behavior: .standUp, isEnabled: true, frequency: ReminderFrequency(interval: 45 * 60, offsetRange: -4 * 60 ... 4 * 60))
     ]
 
     @Published private(set) var schedule: DailySchedule
     @Published private(set) var workReminders: [ReminderRule]
+    @Published private(set) var studyReminders: [ReminderRule]
     @Published private(set) var idleReminders: [ReminderRule]
     @Published private(set) var dailyGoals: DailyGoals
     @Published private(set) var sleepReminderLeadTime: TimeInterval
@@ -50,12 +56,20 @@ final class AppConfigurationStore: ObservableObject {
         workReminders = Self.loadReminderRules(
             from: defaults,
             key: Key.workReminders,
-            defaultValue: Self.defaultWorkReminders
+            defaultValue: Self.defaultWorkReminders,
+            allowedBehaviors: DailyMode.work.reminderPolicy.allowedBehaviors
+        )
+        studyReminders = Self.loadReminderRules(
+            from: defaults,
+            key: Key.studyReminders,
+            defaultValue: Self.defaultStudyReminders,
+            allowedBehaviors: DailyMode.study.reminderPolicy.allowedBehaviors
         )
         idleReminders = Self.loadReminderRules(
             from: defaults,
             key: Key.idleReminders,
-            defaultValue: Self.defaultIdleReminders
+            defaultValue: Self.defaultIdleReminders,
+            allowedBehaviors: DailyMode.idle.reminderPolicy.allowedBehaviors
         )
         dailyGoals = Self.loadDailyGoals(from: defaults)
         sleepReminderLeadTime = Self.loadSleepReminderLeadTime(from: defaults)
@@ -112,20 +126,22 @@ final class AppConfigurationStore: ObservableObject {
     func reminderRules(in context: ReminderContext) -> [ReminderRule] {
         switch context {
         case .work: return workReminders
+        case .study: return studyReminders
         case .idle: return idleReminders
         }
     }
 
     func availableReminderBehaviors(in context: ReminderContext) -> [Behavior] {
         let rules = reminderRules(in: context)
-        return Behavior.allCases.filter { behavior in
+        return context.mode.reminderPolicy.allowedBehaviors.filter { behavior in
             !rules.contains { $0.behavior == behavior }
-        }
+        }.sorted { $0.reminderPriority < $1.reminderPriority }
     }
 
     func addReminder(for behavior: Behavior, in context: ReminderContext) {
         let rules = reminderRules(in: context)
-        guard !rules.contains(where: { $0.behavior == behavior }) else { return }
+        guard context.mode.reminderPolicy.allowedBehaviors.contains(behavior),
+              !rules.contains(where: { $0.behavior == behavior }) else { return }
 
         update(reminderRule(for: behavior, in: context), in: context)
     }
@@ -135,6 +151,9 @@ final class AppConfigurationStore: ObservableObject {
         case .work:
             workReminders.removeAll { $0.behavior == behavior }
             persist(workReminders, forKey: Key.workReminders)
+        case .study:
+            studyReminders.removeAll { $0.behavior == behavior }
+            persist(studyReminders, forKey: Key.studyReminders)
         case .idle:
             idleReminders.removeAll { $0.behavior == behavior }
             persist(idleReminders, forKey: Key.idleReminders)
@@ -146,6 +165,10 @@ final class AppConfigurationStore: ObservableObject {
         for behavior: Behavior,
         in context: ReminderContext
     ) {
+        guard context.mode.reminderPolicy.allowedBehaviors.contains(behavior) else {
+            return
+        }
+
         var rule = reminderRule(for: behavior, in: context)
         rule.isEnabled = isEnabled
         update(rule, in: context)
@@ -156,6 +179,10 @@ final class AppConfigurationStore: ObservableObject {
         for behavior: Behavior,
         in context: ReminderContext
     ) {
+        guard context.mode.reminderPolicy.allowedBehaviors.contains(behavior) else {
+            return
+        }
+
         var rule = reminderRule(for: behavior, in: context)
         rule.frequency = frequency.customValue
         update(rule, in: context)
@@ -164,16 +191,19 @@ final class AppConfigurationStore: ObservableObject {
     private static func loadReminderRules(
         from defaults: UserDefaults,
         key: String,
-        defaultValue: [ReminderRule]
+        defaultValue: [ReminderRule],
+        allowedBehaviors: Set<Behavior>
     ) -> [ReminderRule] {
         guard
             let data = defaults.data(forKey: key),
             let rules = try? JSONDecoder().decode([ReminderRule].self, from: data)
         else {
-            return defaultValue
+            return defaultValue.filter { allowedBehaviors.contains($0.behavior) }
         }
 
-        return normalizedReminderRules(rules)
+        return normalizedReminderRules(rules).filter {
+            allowedBehaviors.contains($0.behavior)
+        }
     }
 
     private static func loadDailyGoals(from defaults: UserDefaults) -> DailyGoals {
@@ -235,7 +265,16 @@ final class AppConfigurationStore: ObservableObject {
     private static func defaultReminderRules(
         for context: ReminderContext
     ) -> [ReminderRule] {
-        context == .work ? defaultWorkReminders : defaultIdleReminders
+        let defaults: [ReminderRule]
+        switch context {
+        case .work: defaults = defaultWorkReminders
+        case .study: defaults = defaultStudyReminders
+        case .idle: defaults = defaultIdleReminders
+        }
+
+        return defaults.filter {
+            context.mode.reminderPolicy.defaultBehaviors.contains($0.behavior)
+        }
     }
 
     private static func fallbackReminderRule(for behavior: Behavior) -> ReminderRule {
@@ -251,6 +290,9 @@ final class AppConfigurationStore: ObservableObject {
         case .work:
             Self.update(&workReminders, with: rule)
             persist(workReminders, forKey: Key.workReminders)
+        case .study:
+            Self.update(&studyReminders, with: rule)
+            persist(studyReminders, forKey: Key.studyReminders)
         case .idle:
             Self.update(&idleReminders, with: rule)
             persist(idleReminders, forKey: Key.idleReminders)
