@@ -29,7 +29,7 @@ struct CurrentContextCard: View {
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
                         .foregroundStyle(.primary)
 
-                    Text(nudgeTitle(for: mode))
+                    Text(mode.nudgeTitle)
                         .font(.system(size: 21, weight: .semibold, design: .rounded))
                         .foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -40,18 +40,7 @@ struct CurrentContextCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .ambientSurface(cornerRadius: 28)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Current context: \(mode.title). \(nudgeTitle(for: mode))")
-    }
-
-    private func nudgeTitle(for mode: DailyMode) -> String {
-        switch mode {
-        case .sleeping:
-            return "Rest easy"
-        case .work:
-            return "A small pause goes a long way"
-        case .idle:
-            return "Move at your own pace"
-        }
+        .accessibilityLabel("Current context: \(mode.title). \(mode.nudgeTitle)")
     }
 
 }

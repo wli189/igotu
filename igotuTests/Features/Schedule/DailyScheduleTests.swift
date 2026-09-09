@@ -49,6 +49,45 @@ struct DailyScheduleTests {
         #expect(result == makeDate(day: 28, hour: 22))
     }
 
+    @Test func storesPeriodsByModeAndKeepsLegacyAccessors() throws {
+        let workPeriod = DailySchedulePeriod(
+            start: DateComponents(hour: 9),
+            end: DateComponents(hour: 17),
+            days: Weekday.defaultWorkdays
+        )
+        let schedule = DailySchedule(periodsByMode: [.work: [workPeriod]])
+
+        #expect(schedule.periods(for: .work) == [workPeriod])
+        #expect(schedule.workPeriods == [workPeriod])
+        #expect(schedule.sleepPeriods.isEmpty)
+        #expect(schedule.scheduledModes == [.work])
+
+        let restored = try JSONDecoder().decode(
+            DailySchedule.self,
+            from: JSONEncoder().encode(schedule)
+        )
+        #expect(restored == schedule)
+    }
+
+    @Test func removingTheLastPeriodRemovesTheModeEntry() {
+        var schedule = DailySchedule(
+            periodsByMode: [
+                .sleeping: [
+                    DailySchedulePeriod(
+                        start: DateComponents(hour: 23),
+                        end: DateComponents(hour: 7),
+                        days: Set(Weekday.allCases)
+                    )
+                ]
+            ]
+        )
+
+        schedule.setPeriods([], for: .sleeping)
+
+        #expect(schedule.periodsByMode.isEmpty)
+        #expect(schedule.scheduledModes.isEmpty)
+    }
+
     private func makeDate(day: Int, hour: Int, minute: Int = 0) -> Date {
         calendar.date(from: DateComponents(
             year: 2026,

@@ -84,29 +84,18 @@ public struct DailyScheduleTimeline {
                 continue
             }
 
-            for period in schedule.sleepPeriods where isActive(period, on: anchor) {
-                if let sleep = makeInterval(
-                    mode: .sleeping,
-                    start: period.start,
-                    end: period.end,
-                    on: anchor
-                ) {
-                    explicitIntervals.append(sleep)
-                    boundaries.insert(sleep.start)
-                    boundaries.insert(sleep.end)
-                }
-            }
-
-            for period in schedule.workPeriods where isActive(period, on: anchor) {
-                if let work = makeInterval(
-                    mode: .work,
-                    start: period.start,
-                    end: period.end,
-                    on: anchor
-                ) {
-                    explicitIntervals.append(work)
-                    boundaries.insert(work.start)
-                    boundaries.insert(work.end)
+            for mode in schedule.scheduledModes {
+                for period in schedule.periods(for: mode) where isActive(period, on: anchor) {
+                    if let interval = makeInterval(
+                        mode: mode,
+                        start: period.start,
+                        end: period.end,
+                        on: anchor
+                    ) {
+                        explicitIntervals.append(interval)
+                        boundaries.insert(interval.start)
+                        boundaries.insert(interval.end)
+                    }
                 }
             }
 
@@ -166,15 +155,16 @@ public struct DailyScheduleTimeline {
         at date: Date,
         within intervals: [ExplicitInterval]
     ) -> DailyMode {
-        if intervals.contains(where: { $0.mode == .sleeping && $0.contains(date) }) {
-            return .sleeping
-        }
+        intervals
+            .filter { $0.contains(date) }
+            .min {
+                if $0.mode.timelinePriority != $1.mode.timelinePriority {
+                    return $0.mode.timelinePriority < $1.mode.timelinePriority
+                }
 
-        if intervals.contains(where: { $0.mode == .work && $0.contains(date) }) {
-            return .work
-        }
-
-        return .idle
+                return $0.mode.key < $1.mode.key
+            }?
+            .mode ?? .idle
     }
 
     private func dateAt(_ components: DateComponents, on date: Date) -> Date? {

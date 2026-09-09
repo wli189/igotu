@@ -16,26 +16,20 @@ struct SchedulePeriodEditorState {
     init(mode: DailyMode, period: DailySchedulePeriod?) {
         selectedMode = mode
 
-        let defaultStart = mode == .sleeping ? 23 : 9
-        let defaultEnd = mode == .sleeping ? 7 : 18
         start = Self.time(
-            from: period?.start ?? DateComponents(hour: defaultStart)
+            from: period?.start ?? DateComponents(hour: mode.defaultStartHour)
         )
         end = Self.time(
-            from: period?.end ?? DateComponents(hour: defaultEnd)
+            from: period?.end ?? DateComponents(hour: mode.defaultEndHour)
         )
-        days = period?.days ?? (
-            mode == .sleeping ? Set(Weekday.allCases) : Weekday.defaultWorkdays
-        )
+        days = period?.days ?? mode.defaultDays
         expandedTimePicker = nil
     }
 
     mutating func applyDefaults(for mode: DailyMode) {
-        let defaultStart = mode == .sleeping ? 23 : 9
-        let defaultEnd = mode == .sleeping ? 7 : 18
-        start = Self.time(from: DateComponents(hour: defaultStart))
-        end = Self.time(from: DateComponents(hour: defaultEnd))
-        days = mode == .sleeping ? Set(Weekday.allCases) : Weekday.defaultWorkdays
+        start = Self.time(from: DateComponents(hour: mode.defaultStartHour))
+        end = Self.time(from: DateComponents(hour: mode.defaultEndHour))
+        days = mode.defaultDays
     }
 
     private static func time(from components: DateComponents) -> Date {
@@ -80,23 +74,23 @@ struct SchedulePeriodEditorFields: View {
             .padding(.bottom, 8)
 
             timePickerRow(
-                title: state.selectedMode == .sleeping ? "Bedtime" : "Work starts",
+                title: state.selectedMode.startTitle,
                 selection: $state.start,
                 picker: .start
             )
 
             timePickerRow(
-                title: state.selectedMode == .sleeping ? "Wake up" : "Work ends",
+                title: state.selectedMode.endTitle,
                 selection: $state.end,
                 picker: .end
             )
 
-            if state.selectedMode == .work {
+            if let context = state.selectedMode.reminderContext {
                 Divider()
                     .padding(.top, 16)
 
                 ReminderRulesEditorView(
-                    context: .work,
+                    context: context,
                     accent: accent,
                     title: "Reminder frequency",
                     horizontalPadding: 0

@@ -103,21 +103,28 @@ final class AppConfigurationStore: ObservableObject {
     }
 
     func reminderRule(for behavior: Behavior, in context: ReminderContext) -> ReminderRule {
-        let rules = context == .work ? workReminders : idleReminders
+        let rules = reminderRules(in: context)
         return rules.first { $0.behavior == behavior }
             ?? Self.defaultReminderRules(for: context).first { $0.behavior == behavior }
             ?? Self.fallbackReminderRule(for: behavior)
     }
 
+    func reminderRules(in context: ReminderContext) -> [ReminderRule] {
+        switch context {
+        case .work: return workReminders
+        case .idle: return idleReminders
+        }
+    }
+
     func availableReminderBehaviors(in context: ReminderContext) -> [Behavior] {
-        let rules = context == .work ? workReminders : idleReminders
+        let rules = reminderRules(in: context)
         return Behavior.allCases.filter { behavior in
             !rules.contains { $0.behavior == behavior }
         }
     }
 
     func addReminder(for behavior: Behavior, in context: ReminderContext) {
-        let rules = context == .work ? workReminders : idleReminders
+        let rules = reminderRules(in: context)
         guard !rules.contains(where: { $0.behavior == behavior }) else { return }
 
         update(reminderRule(for: behavior, in: context), in: context)

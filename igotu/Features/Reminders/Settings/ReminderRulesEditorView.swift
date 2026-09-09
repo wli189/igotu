@@ -11,9 +11,7 @@ struct ReminderRulesEditorView: View {
     var horizontalPadding: CGFloat = 16
 
     private var rules: [ReminderRule] {
-        context == .work
-            ? configuration.workReminders
-            : configuration.idleReminders
+        configuration.reminderRules(in: context)
     }
 
     var body: some View {
@@ -31,9 +29,7 @@ struct ReminderRulesEditorView: View {
                 }
 
                 Spacer()
-                if canAddReminder {
-                    addReminderMenu
-                }
+                addReminderMenu
             }
             .frame(minHeight: 40)
             .padding(.horizontal, horizontalPadding)
@@ -77,6 +73,7 @@ struct ReminderRulesEditorView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add reminder")
+        .disabled(!canAddReminder)
     }
 
     private func reminderRow(for behavior: Behavior) -> some View {

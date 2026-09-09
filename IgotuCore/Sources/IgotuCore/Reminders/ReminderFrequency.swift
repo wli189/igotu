@@ -35,6 +35,17 @@ public struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
 
     public var isCustom: Bool { preset == nil }
 
+    public struct PresetOption: Identifiable, Equatable, Hashable {
+        public let frequency: ReminderFrequency
+
+        public var id: String { frequency.id }
+        public var title: String { frequency.title }
+
+        public init(frequency: ReminderFrequency) {
+            self.frequency = frequency
+        }
+    }
+
     public var customValue: ReminderFrequency {
         ReminderFrequency(interval: interval, offsetRange: offsetRange)
     }
@@ -48,7 +59,13 @@ public struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
     ].map { $0 * 60 }
 
     public static func intervalOptions(including interval: TimeInterval) -> [TimeInterval] {
-        Array(Set(standardIntervals + [interval])).sorted()
+        Array(Set(availableIntervals + [interval])).sorted()
+    }
+
+    /// The interval catalog used by editors. Add future choices here instead
+    /// of duplicating interval values in individual views.
+    public static var availableIntervals: [TimeInterval] {
+        standardIntervals
     }
 
     public static func offsetTierMinutes(for interval: TimeInterval) -> [Int] {
@@ -97,6 +114,10 @@ public struct ReminderFrequency: Codable, Equatable, Hashable, Identifiable {
     )
 
     public static let allCases = [occasional, regular, frequent]
+
+    public static var presetOptions: [PresetOption] {
+        allCases.map(PresetOption.init(frequency:))
+    }
 
     public init(interval: TimeInterval, offsetRange: ClosedRange<TimeInterval>) {
         self.init(

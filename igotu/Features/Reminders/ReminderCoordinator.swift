@@ -564,9 +564,6 @@ final class ReminderCoordinator: ObservableObject {
     }
 
     private func context(for mode: DailyMode) -> ReminderContext {
-        switch mode {
-        case .work: return .work
-        case .idle, .sleeping: return .idle
-        }
+        mode.reminderContext ?? .idle
     }
 }

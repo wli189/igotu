@@ -17,4 +17,10 @@ struct ReminderFrequencyTests {
         #expect(ReminderFrequency.regular.customValue.interval == ReminderFrequency.regular.interval)
         #expect(ReminderFrequency.regular.customValue.offsetRange == ReminderFrequency.regular.offsetRange)
     }
+
+    @Test func frequencyCatalogExposesPresetsAndIntervalsToEditors() {
+        #expect(ReminderFrequency.presetOptions.map(\.frequency) == ReminderFrequency.allCases)
+        #expect(ReminderFrequency.intervalOptions(including: 45 * 60).contains(45 * 60))
+        #expect(ReminderFrequency.availableIntervals == ReminderFrequency.standardIntervals)
+    }
 }

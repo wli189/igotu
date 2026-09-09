@@ -122,9 +122,8 @@ struct SchedulePeriodEditorView: View {
         let startComponents = components(from: editorState.start)
         let endComponents = components(from: editorState.end)
         guard startComponents != endComponents else {
-            errorMessage = editorState.selectedMode == .sleeping
-                ? "Your bedtime and wake-up time cannot be the same."
-                : "Your work start time and end time cannot be the same."
+            errorMessage = "Your (editorState.selectedMode.startTitle.lowercased()) "
+                + "and (editorState.selectedMode.endTitle.lowercased()) cannot be the same."
             return
         }
 

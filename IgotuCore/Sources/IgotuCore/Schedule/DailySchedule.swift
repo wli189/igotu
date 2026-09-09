@@ -25,15 +25,26 @@ public struct DailySchedulePeriod: Codable, Equatable, Identifiable {
 }
 
 public struct DailySchedule: Codable, Equatable {
-    public var sleepPeriods: [DailySchedulePeriod]
-    public var workPeriods: [DailySchedulePeriod]
+    public private(set) var periodsByMode: [DailyMode: [DailySchedulePeriod]]
+
+    public var scheduledModes: [DailyMode] {
+        DailyMode.scheduleModes.filter { periodsByMode[$0]?.isEmpty == false }
+    }
+
+    public init(periodsByMode: [DailyMode: [DailySchedulePeriod]]) {
+        self.periodsByMode = periodsByMode.filter { mode, periods in
+            mode.isSchedulable && !periods.isEmpty
+        }
+    }
 
     public init(
         sleepPeriods: [DailySchedulePeriod],
         workPeriods: [DailySchedulePeriod]
     ) {
-        self.sleepPeriods = sleepPeriods
-        self.workPeriods = workPeriods
+        self.init(periodsByMode: [
+            .sleeping: sleepPeriods,
+            .work: workPeriods
+        ])
     }
 
     // This initializer keeps callers and saved data from the first version compatible.
@@ -59,6 +70,7 @@ public struct DailySchedule: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
+        case periodsByMode
         case sleepPeriods
         case workPeriods
         case sleepStart
@@ -70,6 +82,14 @@ public struct DailySchedule: Codable, Equatable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if let savedPeriodsByMode = try container.decodeIfPresent(
+            [DailyMode: [DailySchedulePeriod]].self,
+            forKey: .periodsByMode
+        ) {
+            self.init(periodsByMode: savedPeriodsByMode)
+            return
+        }
 
         if let savedSleepPeriods = try container.decodeIfPresent(
             [DailySchedulePeriod].self,
@@ -103,12 +123,42 @@ public struct DailySchedule: Codable, Equatable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(periodsByMode, forKey: .periodsByMode)
+        // Keep sleep/work keys for older app versions that only understand
+        // the original two-mode schedule shape.
         try container.encode(sleepPeriods, forKey: .sleepPeriods)
         try container.encode(workPeriods, forKey: .workPeriods)
     }
 }
 
 extension DailySchedule {
+    public func periods(for mode: DailyMode) -> [DailySchedulePeriod] {
+        periodsByMode[mode] ?? []
+    }
+
+    public mutating func setPeriods(
+        _ periods: [DailySchedulePeriod],
+        for mode: DailyMode
+    ) {
+        guard mode.isSchedulable else { return }
+
+        if periods.isEmpty {
+            periodsByMode.removeValue(forKey: mode)
+        } else {
+            periodsByMode[mode] = periods
+        }
+    }
+
+    public var sleepPeriods: [DailySchedulePeriod] {
+        get { periods(for: .sleeping) }
+        set { setPeriods(newValue, for: .sleeping) }
+    }
+
+    public var workPeriods: [DailySchedulePeriod] {
+        get { periods(for: .work) }
+        set { setPeriods(newValue, for: .work) }
+    }
+
     // Legacy accessors remain useful to older callers while the UI moves to period lists.
     public var sleepStart: DateComponents {
         sleepPeriods.first?.start ?? DateComponents(hour: 23)
@@ -134,7 +184,7 @@ extension DailySchedule {
         -> [DailySchedulePeriod]
     {
         let weekday = Weekday(rawValue: calendar.component(.weekday, from: date))
-        let periods = mode == .sleeping ? sleepPeriods : workPeriods
+        let periods = periods(for: mode)
 
         return periods
             .filter { period in

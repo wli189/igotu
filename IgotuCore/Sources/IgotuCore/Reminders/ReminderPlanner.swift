@@ -176,16 +176,11 @@ public struct ReminderPlanner {
             startingAt: planningStart,
             count: intervalLimit
         ) {
-            let rules: [ReminderRule]
-
-            switch interval.mode {
-            case .sleeping:
-                continue
-            case .work:
-                rules = workRules
-            case .idle:
-                rules = idleRules
-            }
+            guard let rules = rules(
+                for: interval.mode,
+                workRules: workRules,
+                idleRules: idleRules
+            ) else { continue }
 
             let intervalEnd = min(interval.end, horizonEnd)
             guard interval.start < horizonEnd, interval.start < intervalEnd else {
@@ -298,33 +293,33 @@ public struct ReminderPlanner {
         workRules: [ReminderRule],
         idleRules: [ReminderRule]
     ) -> ReminderRule? {
-        let rules: [ReminderRule]
-
-        switch mode {
-        case .sleeping:
-            return nil
-        case .work:
-            rules = workRules
-        case .idle:
-            rules = idleRules
-        }
-
-        return rules.first { $0.behavior == behavior }
+        return rules(
+            for: mode,
+            workRules: workRules,
+            idleRules: idleRules
+        )?.first { $0.behavior == behavior }
     }
 
     private func mode(for context: ReminderContext) -> DailyMode? {
-        switch context {
-        case .work:
-            return .work
-        case .idle:
-            return .idle
-        }
+        DailyMode.allCases.first { $0.reminderContext == context }
     }
 
     private func context(for mode: DailyMode) -> ReminderContext {
-        switch mode {
-        case .work: return .work
-        case .idle, .sleeping: return .idle
+        mode.reminderContext ?? .idle
+    }
+
+    private func rules(
+        for mode: DailyMode,
+        workRules: [ReminderRule],
+        idleRules: [ReminderRule]
+    ) -> [ReminderRule]? {
+        switch mode.reminderContext {
+        case .work:
+            return workRules
+        case .idle:
+            return idleRules
+        case nil:
+            return nil
         }
     }
 

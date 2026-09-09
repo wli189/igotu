@@ -29,8 +29,7 @@ struct SetUpView: View {
     private let themeColorService = ThemeColorService()
     private let scheduleValidator = DailyScheduleValidator()
 
-    @State private var sleepPeriods: [DailySchedulePeriod] = []
-    @State private var workPeriods: [DailySchedulePeriod] = []
+    @State private var periodsByMode: [DailyMode: [DailySchedulePeriod]] = [:]
     @State private var sleepReminderLeadMinutes = 30
     @State private var editorConfiguration: SchedulePeriodEditorConfiguration?
     @State private var errorMessage: String?
@@ -50,12 +49,11 @@ struct SetUpView: View {
                 }
 
                 ScheduleOverviewSection(
-                    sleepPeriods: sleepPeriods,
-                    workPeriods: workPeriods,
+                    periodsByMode: periodsByMode,
                     accent: accent,
                     onAdd: {
                         editorConfiguration = SchedulePeriodEditorConfiguration(
-                            mode: .work,
+                            mode: DailyMode.defaultScheduleMode,
                             period: nil
                         )
                     },
@@ -96,10 +94,7 @@ struct SetUpView: View {
         .onAppear {
             loadSavedSchedule()
         }
-        .onChange(of: sleepPeriods) { _, _ in
-            saveEditedScheduleIfNeeded()
-        }
-        .onChange(of: workPeriods) { _, _ in
+        .onChange(of: periodsByMode) { _, _ in
             saveEditedScheduleIfNeeded()
         }
         .onChange(of: sleepReminderLeadMinutes) { _, _ in
@@ -132,17 +127,13 @@ struct SetUpView: View {
     }
 
     private var currentSchedule: DailySchedule {
-        DailySchedule(
-            sleepPeriods: sleepPeriods,
-            workPeriods: workPeriods
-        )
+        DailySchedule(periodsByMode: periodsByMode)
     }
 
     private func loadSavedSchedule() {
         guard !hasLoadedSavedSchedule else { return }
 
-        sleepPeriods = configuration.schedule.sleepPeriods
-        workPeriods = configuration.schedule.workPeriods
+        periodsByMode = configuration.schedule.periodsByMode
         sleepReminderLeadMinutes = Int(configuration.sleepReminderLeadTime / 60)
         hasLoadedSavedSchedule = true
     }
@@ -183,49 +174,34 @@ struct SetUpView: View {
         for mode: DailyMode,
         replacing originalMode: DailyMode
     ) -> String? {
-        var proposedSleepPeriods = sleepPeriods
-        var proposedWorkPeriods = workPeriods
+        var proposedPeriodsByMode = periodsByMode
 
         if mode != originalMode {
-            if originalMode == .sleeping {
-                proposedSleepPeriods.removeAll { $0.id == period.id }
-            } else {
-                proposedWorkPeriods.removeAll { $0.id == period.id }
-            }
+            proposedPeriodsByMode[originalMode, default: []]
+                .removeAll { $0.id == period.id }
         }
 
-        if mode == .sleeping {
-            if let index = proposedSleepPeriods.firstIndex(where: { $0.id == period.id }) {
-                proposedSleepPeriods[index] = period
-            } else {
-                proposedSleepPeriods.append(period)
-            }
+        var proposedPeriods = proposedPeriodsByMode[mode] ?? []
+        if let index = proposedPeriods.firstIndex(where: { $0.id == period.id }) {
+            proposedPeriods[index] = period
         } else {
-            if let index = proposedWorkPeriods.firstIndex(where: { $0.id == period.id }) {
-                proposedWorkPeriods[index] = period
-            } else {
-                proposedWorkPeriods.append(period)
-            }
+            proposedPeriods.append(period)
         }
+        proposedPeriodsByMode[mode] = proposedPeriods
 
-        let proposedSchedule = DailySchedule(
-            sleepPeriods: proposedSleepPeriods,
-            workPeriods: proposedWorkPeriods
-        )
+        let proposedSchedule = DailySchedule(periodsByMode: proposedPeriodsByMode)
         if let issue = scheduleValidator.issue(for: proposedSchedule) {
             return issue.message
         }
 
-        sleepPeriods = proposedSleepPeriods
-        workPeriods = proposedWorkPeriods
+        periodsByMode = proposedPeriodsByMode
         return nil
     }
 
     private func delete(_ period: DailySchedulePeriod, from mode: DailyMode) {
-        if mode == .sleeping {
-            sleepPeriods.removeAll { $0.id == period.id }
-        } else {
-            workPeriods.removeAll { $0.id == period.id }
+        periodsByMode[mode, default: []].removeAll { $0.id == period.id }
+        if periodsByMode[mode]?.isEmpty == true {
+            periodsByMode.removeValue(forKey: mode)
         }
     }
 

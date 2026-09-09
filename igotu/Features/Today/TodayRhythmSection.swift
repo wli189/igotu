@@ -15,31 +15,26 @@ struct TodayRhythmSection: View {
     }
 
     var body: some View {
-        let sleepPeriods = schedule.periods(for: .sleeping, on: today)
-        let workPeriods = schedule.periods(for: .work, on: today)
+        let configuredModes = DailyMode.scheduleModes
 
         VStack(alignment: .leading, spacing: 14) {
             sectionLabel("SCHEDULE")
 
             VStack(alignment: .leading, spacing: 0) {
-                scheduleRows(
-                    title: "Sleep",
-                    icon: "moon.fill",
-                    periods: sleepPeriods,
-                    emptyTitle: "No sleep schedule",
-                    tint: accent
-                )
+                ForEach(Array(configuredModes.enumerated()), id: \.element) { index, mode in
+                    if index > 0 {
+                        Divider()
+                            .padding(.leading, 54)
+                    }
 
-                Divider()
-                    .padding(.leading, 54)
-
-                scheduleRows(
-                    title: "Work",
-                    icon: "briefcase.fill",
-                    periods: workPeriods,
-                    emptyTitle: "No work periods",
-                    tint: accent
-                )
+                    scheduleRows(
+                        title: mode.title,
+                        icon: mode.icon,
+                        periods: schedule.periods(for: mode, on: today),
+                        emptyTitle: "No (mode.title.lowercased()) periods",
+                        tint: accent
+                    )
+                }
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 8)

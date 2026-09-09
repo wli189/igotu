@@ -4,9 +4,12 @@ public struct DailyScheduleValidator {
     public enum Issue: Equatable {
         case sleepTimesMatch
         case workTimesMatch
+        case modeTimesMatch(DailyMode)
         case sleepPeriodsOverlap
         case workPeriodsOverlap
+        case modePeriodsOverlap(DailyMode)
         case sleepAndWorkOverlap
+        case modeOverlap(DailyMode, DailyMode)
 
         public var message: String {
             switch self {
@@ -14,12 +17,18 @@ public struct DailyScheduleValidator {
                 return "Your bedtime and wake-up time cannot be the same."
             case .workTimesMatch:
                 return "Your work start time and end time cannot be the same."
+            case let .modeTimesMatch(mode):
+                return "Your (mode.startTitle.lowercased()) and (mode.endTitle.lowercased()) cannot be the same."
             case .sleepPeriodsOverlap:
                 return "Only one sleep schedule can be set for each day."
             case .workPeriodsOverlap:
                 return "Work periods cannot overlap on the same day."
+            case let .modePeriodsOverlap(mode):
+                return "(mode.title) periods cannot overlap on the same day."
             case .sleepAndWorkOverlap:
                 return "Your work hours and bedtime overlap."
+            case let .modeOverlap(first, second):
+                return "Your (first.title.lowercased()) and (second.title.lowercased()) periods overlap."
             }
         }
     }
@@ -35,31 +44,48 @@ public struct DailyScheduleValidator {
     public init() {}
 
     public func issue(for schedule: DailySchedule) -> Issue? {
-        if schedule.sleepPeriods.contains(where: { timesMatch($0) }) {
-            return .sleepTimesMatch
+        let modes = DailyMode.scheduleModes
+            .filter { !schedule.periods(for: $0).isEmpty }
+
+        for mode in modes {
+            let periods = schedule.periods(for: mode)
+            if periods.contains(where: timesMatch) {
+                switch mode {
+                case .sleeping: return .sleepTimesMatch
+                case .work: return .workTimesMatch
+                case .idle: return .modeTimesMatch(mode)
+                }
+            }
+
+            if mode == .sleeping,
+               hasMultipleSleepSchedulesOnSameDay(periods)
+            {
+                return .sleepPeriodsOverlap
+            }
+
+            if hasOverlap(within: absolutePeriods(for: periods)) {
+                switch mode {
+                case .sleeping: return .sleepPeriodsOverlap
+                case .work: return .workPeriodsOverlap
+                case .idle: return .modePeriodsOverlap(mode)
+                }
+            }
         }
 
-        if schedule.workPeriods.contains(where: { timesMatch($0) }) {
-            return .workTimesMatch
-        }
+        for firstIndex in modes.indices {
+            let firstMode = modes[firstIndex]
+            let firstPeriods = absolutePeriods(for: schedule.periods(for: firstMode))
 
-        let sleep = absolutePeriods(for: schedule.sleepPeriods)
-        let work = absolutePeriods(for: schedule.workPeriods)
+            for secondMode in modes.dropFirst(firstIndex + 1) {
+                let secondPeriods = absolutePeriods(for: schedule.periods(for: secondMode))
+                if hasOverlap(between: firstPeriods, and: secondPeriods) {
+                    if Set([firstMode, secondMode]) == [.sleeping, .work] {
+                        return .sleepAndWorkOverlap
+                    }
 
-        if hasMultipleSleepSchedulesOnSameDay(schedule.sleepPeriods) {
-            return .sleepPeriodsOverlap
-        }
-
-        if hasOverlap(within: sleep) {
-            return .sleepPeriodsOverlap
-        }
-
-        if hasOverlap(within: work) {
-            return .workPeriodsOverlap
-        }
-
-        if hasOverlap(between: sleep, and: work) {
-            return .sleepAndWorkOverlap
+                    return .modeOverlap(firstMode, secondMode)
+                }
+            }
         }
 
         return nil

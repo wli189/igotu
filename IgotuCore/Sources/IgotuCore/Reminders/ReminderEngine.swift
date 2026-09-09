@@ -134,11 +134,7 @@ public struct ReminderEngine {
     }
 
     private func context(for mode: DailyMode) -> ReminderContext? {
-        switch mode {
-        case .sleeping: return nil
-        case .work: return .work
-        case .idle: return .idle
-        }
+        mode.reminderContext
     }
 
     private func isWithinActiveInterval(

@@ -2,13 +2,16 @@ import SwiftUI
 import IgotuCore
 
 struct ScheduleOverviewSection: View {
-    let sleepPeriods: [DailySchedulePeriod]
-    let workPeriods: [DailySchedulePeriod]
+    let periodsByMode: [DailyMode: [DailySchedulePeriod]]
     let accent: Color
     let onAdd: () -> Void
     let onEdit: (DailyMode, DailySchedulePeriod) -> Void
 
     var body: some View {
+        let configuredModes = DailyMode.scheduleModes.filter {
+            periodsByMode[$0]?.isEmpty == false
+        }
+
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 ScheduleSettingsSectionLabel(
@@ -29,7 +32,7 @@ struct ScheduleOverviewSection: View {
 
             ScheduleSettingsSurface {
                 Group {
-                    if sleepPeriods.isEmpty && workPeriods.isEmpty {
+                    if configuredModes.isEmpty {
                         Text("No schedule periods")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
@@ -37,26 +40,15 @@ struct ScheduleOverviewSection: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
                         VStack(alignment: .leading, spacing: 0) {
-                            if !sleepPeriods.isEmpty {
-                                schedulePeriodsContent(
-                                    title: "Sleep",
-                                    systemImage: "moon.fill",
-                                    mode: .sleeping,
-                                    periods: sleepPeriods
-                                )
-                            }
+                            ForEach(Array(configuredModes.enumerated()), id: \.element) { index, mode in
+                                if index > 0 {
+                                    Divider()
+                                        .padding(.leading, 44)
+                                }
 
-                            if !sleepPeriods.isEmpty && !workPeriods.isEmpty {
-                                Divider()
-                                    .padding(.leading, 44)
-                            }
-
-                            if !workPeriods.isEmpty {
                                 schedulePeriodsContent(
-                                    title: "Work",
-                                    systemImage: "briefcase.fill",
-                                    mode: .work,
-                                    periods: workPeriods
+                                    mode: mode,
+                                    periods: periodsByMode[mode] ?? []
                                 )
                             }
                         }
@@ -69,13 +61,11 @@ struct ScheduleOverviewSection: View {
     }
 
     private func schedulePeriodsContent(
-        title: String,
-        systemImage: String,
         mode: DailyMode,
         periods: [DailySchedulePeriod]
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Label(title, systemImage: systemImage)
+            Label(mode.title, systemImage: mode.icon)
                 .font(.headline)
                 .foregroundStyle(.primary)
                 .padding(.bottom, 2)
@@ -101,7 +91,7 @@ struct ScheduleOverviewSection: View {
             onEdit(mode, period)
         } label: {
             HStack(spacing: 12) {
-                Image(systemName: mode == .sleeping ? "moon.fill" : "clock.fill")
+                Image(systemName: mode.icon)
                     .font(.body.weight(.semibold))
                     .foregroundStyle(accent)
                     .frame(width: 36, height: 36)
