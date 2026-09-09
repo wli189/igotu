@@ -11,14 +11,13 @@ struct ReminderSettingsView: View {
         let accent = themeColorService.currentColor(for: configuration.schedule)
 
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Label("Reminders", systemImage: "bell.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(accent)
-
-                ReminderRulesEditorView(context: context)
-                    .ambientSurface(cornerRadius: 24)
-            }
+            ReminderRulesEditorView(
+                context: context,
+                accent: accent,
+                title: "Reminders",
+                headerSystemImage: "bell.fill"
+            )
+            .ambientSurface(cornerRadius: 24)
             .padding(.horizontal, 20)
             .padding(.top, 16)
             .padding(.bottom, 24)

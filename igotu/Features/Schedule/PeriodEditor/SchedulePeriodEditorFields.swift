@@ -64,11 +64,13 @@ struct SchedulePeriodEditorFields: View {
                         .tag(mode)
                 }
             } label: {
-                Label(state.selectedMode.title, systemImage: state.selectedMode.icon)
+                Text(state.selectedMode.title)
                     .font(.headline)
+                    .foregroundStyle(accent)
             }
             .pickerStyle(.menu)
             .labelsHidden()
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.bottom, 8)
 
             timePickerRow(
@@ -89,7 +91,9 @@ struct SchedulePeriodEditorFields: View {
 
                 ReminderRulesEditorView(
                     context: .work,
-                    title: "Reminder frequency"
+                    accent: accent,
+                    title: "Reminder frequency",
+                    horizontalPadding: 0
                 )
             }
 
@@ -147,7 +151,6 @@ struct SchedulePeriodEditorFields: View {
                 .clipped()
             }
         }
-        .buttonStyle(.plain)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 

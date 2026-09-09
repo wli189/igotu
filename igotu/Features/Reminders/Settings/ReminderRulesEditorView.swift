@@ -5,7 +5,10 @@ struct ReminderRulesEditorView: View {
     @EnvironmentObject private var configuration: AppConfigurationStore
 
     let context: ReminderContext
+    let accent: Color
     var title: String?
+    var headerSystemImage: String? = nil
+    var horizontalPadding: CGFloat = 16
 
     private var rules: [ReminderRule] {
         context == .work
@@ -17,20 +20,28 @@ struct ReminderRulesEditorView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 if let title {
-                    Text(title)
-                        .font(.headline)
+                    if let headerSystemImage {
+                        Label(title, systemImage: headerSystemImage)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(accent)
+                    } else {
+                        Text(title)
+                            .font(.headline)
+                    }
                 }
 
                 Spacer()
-                addReminderMenu
+                if canAddReminder {
+                    addReminderMenu
+                }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, horizontalPadding)
             .padding(.top, 16)
 
             ForEach(Array(rules.enumerated()), id: \.element.behavior) { index, rule in
                 if index > 0 {
                     Divider()
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, horizontalPadding)
                 }
 
                 reminderRow(for: rule.behavior)
@@ -41,9 +52,14 @@ struct ReminderRulesEditorView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
+                    .padding(.horizontal, horizontalPadding)
+                    .padding(.vertical, 16)
             }
         }
+    }
+
+    private var canAddReminder: Bool {
+        !configuration.availableReminderBehaviors(in: context).isEmpty
     }
 
     private var addReminderMenu: some View {
@@ -57,9 +73,17 @@ struct ReminderRulesEditorView: View {
             }
         } label: {
             Image(systemName: "plus")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(accent)
+                .frame(width: 40, height: 40)
+                .background(.thinMaterial, in: Circle())
+                .overlay {
+                    Circle()
+                        .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                }
         }
-        .disabled(configuration.availableReminderBehaviors(in: context).isEmpty)
-        .buttonStyle(.bordered)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add reminder")
     }
 
     private func reminderRow(for behavior: Behavior) -> some View {
@@ -67,9 +91,9 @@ struct ReminderRulesEditorView: View {
             HStack(spacing: 12) {
                 Image(systemName: behavior.icon)
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(accent)
                     .frame(width: 34, height: 34)
-                    .background(Color.accentColor.opacity(0.12), in: Circle())
+                    .background(accent.opacity(0.12), in: Circle())
 
                 Text(behavior.title)
                     .font(.body.weight(.semibold))
@@ -89,25 +113,37 @@ struct ReminderRulesEditorView: View {
 
             ReminderFrequencyEditorView(behavior: behavior, context: context)
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, horizontalPadding)
         .padding(.vertical, 14)
     }
 }
 
 #Preview("Work Rules") {
-    ReminderRulesEditorView(context: .work, title: "Reminder frequency")
+    ReminderRulesEditorView(
+        context: .work,
+        accent: .blue,
+        title: "Reminder frequency"
+    )
         .environmentObject(PreviewSupport.configuration(named: "work-rules"))
         .padding()
 }
 
 #Preview("Idle Rules") {
-    ReminderRulesEditorView(context: .idle, title: "Reminder frequency")
+    ReminderRulesEditorView(
+        context: .idle,
+        accent: .orange,
+        title: "Reminder frequency"
+    )
         .environmentObject(PreviewSupport.configuration(named: "idle-rules"))
         .padding()
 }
 
 #Preview("No Rules") {
-    ReminderRulesEditorView(context: .work, title: "Reminder frequency")
+    ReminderRulesEditorView(
+        context: .work,
+        accent: .blue,
+        title: "Reminder frequency"
+    )
         .environmentObject(
             PreviewSupport.configuration(
                 named: "empty-rules",
