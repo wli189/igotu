@@ -21,16 +21,16 @@ struct ReminderPreferencesSection: View {
                     Divider()
                         .padding(.leading, 62)
 
-                    ScheduleSettingsNavigationRow(
-                        title: "Work reminders",
-                        systemImage: "briefcase.fill",
-                        accent: accent
-                    ) {
-                        ReminderSettingsView(context: .work)
-                    }
-
-                    Divider()
-                        .padding(.leading, 62)
+//                    ScheduleSettingsNavigationRow(
+//                        title: "Work reminders",
+//                        systemImage: "briefcase.fill",
+//                        accent: accent
+//                    ) {
+//                        ReminderSettingsView(context: .work)
+//                    }
+//
+//                    Divider()
+//                        .padding(.leading, 62)
 
                     ScheduleSettingsNavigationRow(
                         title: "Idle reminders",
