@@ -19,11 +19,11 @@ struct ScheduleOverviewSection: View {
 
                 Spacer()
 
-                Button(action: onAdd) {
-                    Label("Add time period", systemImage: "plus.circle.fill")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .buttonStyle(.borderless)
+                CircularAddButton(
+                    accent: accent,
+                    accessibilityLabel: "Add time period",
+                    action: onAdd
+                )
                 .accessibilityHint("Choose a mode in the editor")
             }
 

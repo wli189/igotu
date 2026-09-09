@@ -14,7 +14,6 @@ struct SchedulePeriodEditorView: View {
     @State private var selectedDetent: PresentationDetent = .large
     @State private var iPadSelectedDetent: PresentationDetent
     @State private var errorMessage: String?
-    @State private var showsDeleteConfirmation = false
 
     private var accent: Color {
         ThemeColorService().color(for: editorState.selectedMode.wellnessTheme)
@@ -75,7 +74,8 @@ struct SchedulePeriodEditorView: View {
                 if onDelete != nil {
                     ToolbarItem(placement: .bottomBar) {
                         Button("Delete", role: .destructive) {
-                            showsDeleteConfirmation = true
+                            onDelete?()
+                            dismiss()
                         }
                     }
                 }
@@ -94,17 +94,6 @@ struct SchedulePeriodEditorView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(errorMessage ?? "")
-            }
-            .confirmationDialog(
-                "Delete this schedule?",
-                isPresented: $showsDeleteConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Delete", role: .destructive) {
-                    onDelete?()
-                    dismiss()
-                }
-                Button("Cancel", role: .cancel) { }
             }
         }
         .tint(accent)

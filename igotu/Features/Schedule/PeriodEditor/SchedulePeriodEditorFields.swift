@@ -64,9 +64,15 @@ struct SchedulePeriodEditorFields: View {
                         .tag(mode)
                 }
             } label: {
-                Text(state.selectedMode.title)
-                    .font(.headline)
-                    .foregroundStyle(accent)
+                HStack(spacing: 12) {
+                    Image(systemName: state.selectedMode.icon)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(accent)
+
+                    Text(state.selectedMode.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                }
             }
             .pickerStyle(.menu)
             .labelsHidden()
@@ -110,6 +116,7 @@ struct SchedulePeriodEditorFields: View {
                 }
             }
         }
+        .tint(.primary)
     }
 
     private func timePickerRow(
@@ -123,6 +130,7 @@ struct SchedulePeriodEditorFields: View {
             } label: {
                 HStack {
                     Text(title)
+                        .foregroundStyle(.primary)
 
                     Spacer()
 
@@ -134,6 +142,9 @@ struct SchedulePeriodEditorFields: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
                     }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color(.secondarySystemFill), in: Capsule())
                 }
                 .frame(minHeight: 44)
             }
