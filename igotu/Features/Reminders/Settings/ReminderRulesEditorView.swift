@@ -35,6 +35,7 @@ struct ReminderRulesEditorView: View {
                     addReminderMenu
                 }
             }
+            .frame(minHeight: 40)
             .padding(.horizontal, horizontalPadding)
             .padding(.top, 16)
 
@@ -75,12 +76,13 @@ struct ReminderRulesEditorView: View {
             Image(systemName: "plus")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(accent)
-                .frame(width: 40, height: 40)
+                .frame(width: 32, height: 32)
                 .background(.thinMaterial, in: Circle())
                 .overlay {
                     Circle()
                         .stroke(Color.primary.opacity(0.06), lineWidth: 1)
                 }
+                .frame(width: 40, height: 40)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Add reminder")
