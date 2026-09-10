@@ -1,4 +1,40 @@
-# Swift Package Manager and Xcode build artifacts
+# Build artifacts (Xcode + SPM)
+build/
 .build/
 .swiftpm/
-build/
+DerivedData/
+*.xcuserdata/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager (source dependencies)
+Packages/
+Package.pins
+Package.resolved
+
+# Test coverage / profiling
+*.gcda
+*.gcno
+*.gcov
+coverage.info
+lcov.info
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode cloud / CI artifacts
+.xcarchive/
+
+# Fastlane (if added later)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# IDE-generated index files
+*.xcindex
